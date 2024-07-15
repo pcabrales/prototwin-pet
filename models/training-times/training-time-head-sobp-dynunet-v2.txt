@@ -1,1 +1,0 @@
-Training time: 13181.61098742485 seconds. Best epoch: 399

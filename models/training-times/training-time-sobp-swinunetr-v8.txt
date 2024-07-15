@@ -1,1 +1,0 @@
-epoch 31 batch 30

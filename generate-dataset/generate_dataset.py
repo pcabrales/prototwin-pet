@@ -3,7 +3,6 @@
 import os
 import sys
 import gc
-import time
 import shutil
 import subprocess
 import json
@@ -12,7 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import array_api_compat.cupy as xp
 from scipy.io import loadmat
-from utils import get_isotope_factors, crop_save_head_image, crop_save_npy, gen_voxel, positronCTtoMat, convert_CT_to_mhd, generate_sensitivity
+from utils import get_isotope_factors, crop_save_image, crop_save_npy, gen_voxel, convert_CT_to_mhd, generate_sensitivity
 from utils_parallelproj import parallelproj_listmode_reconstruction
 script_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(script_dir)
@@ -26,7 +25,7 @@ dev = xp.cuda.Device(0)
 dataset_num = 1
 seed_number = 42
 patient_name = 'head-cort'
-patient_folder = os.path.join(script_dir, f'../../../HeadPlans/{patient_name}')  # Folder with the patient's treatment plan
+patient_folder = os.path.join(script_dir, f'../../HeadPlans/{patient_name}')  # Folder with the patient's treatment plan
 dataset_folder = os.path.join(patient_folder, f"dataset{dataset_num}")  # Folder to save the dataset
 npy_patient_folder = os.path.join(script_dir, f"../data/{patient_name}")  # Folder to save the numpy arrays for model training
 npy_dataset_folder = os.path.join(npy_patient_folder, f"dataset{dataset_num}")  # Folder to save the numpy arrays for model training
@@ -48,7 +47,7 @@ initial_time = 10  # minutes time spent before placing the patient in a PET scan
 final_time = 40  # minutes
 irradiation_time = 2  # minutes  # time spent delivering the field
 field_setup_time = 2  # minutes  # time spent setting up the field (gantry rotation)
-isotope_list = ['C11', 'N13', 'O15', 'K38'] #, 'C10', 'O14', 'P30']  ### For WASHOUT_CURVE only C11
+isotope_list = ['C11', 'N13', 'O15', 'K38']
 #
 #   MONTE CARLO SIMULATION OF THE TREATMENT
 N_sobps = 200
@@ -61,26 +60,39 @@ N_reference = 2e6  # reference number of particles per bixel
 #
 # PET SIMULATION
 scanner = 'vision'  # only scanner implemented so far
-mcgpu_location = os.path.join(script_dir, './pet-simulation-reconstruction/mcgpu-pet')
+mcgpu_location = os.path.join(script_dir, 'pet-simulation-reconstruction/mcgpu-pet')
 mcgpu_input_location = os.path.join(mcgpu_location, f"MCGPU-PET-{scanner}.in")
 mcgpu_executable_location = os.path.join(mcgpu_location, 'MCGPU-PET.x')
+materials_path = os.path.join(mcgpu_location, "materials")
 #
 # PET RECONSTRUCTION
 num_subsets=2
 osem_iterations=3
 # -----------------------------------------------------------------------------------------------------------------------------------------
 
-# Convert DICOM to mhd to be processed by FRED, provide matrad_output to remove everything outside the body and avoid the couch interfering with the simulation
-convert_CT_to_mhd(mhd_file=mhd_file, dicom_dir=dicom_dir,
-                  image_size=uncropped_shape, matRad_output=matRad_output)
-
 if not os.path.exists(dataset_folder):
     os.makedirs(dataset_folder)
-
 if not os.path.exists(npy_dataset_folder):
+    print("Exists")
     os.makedirs(npy_dataset_folder)
     os.makedirs(os.path.join(npy_dataset_folder, "activity/"))
     os.makedirs(os.path.join(npy_dataset_folder, "dose/"))
+
+# Move the mcgpu input to the patient folder
+shutil.copy(mcgpu_input_location, npy_dataset_folder) 
+mcgpu_input_location = os.path.join(npy_dataset_folder, os.path.basename(mcgpu_input_location))
+with open(mcgpu_input_location, 'r') as file:
+    lines = file.readlines()
+keyword_materials = 'mcgpu.gz'  # lines specifying the materials include this string because it is the material composition file
+for idx, input_line in enumerate(lines):
+    if keyword_materials in input_line:
+        lines[idx] = materials_path + input_line
+with open(mcgpu_input_location, 'w') as file:
+    file.writelines(lines)
+
+# Convert DICOM to mhd to be processed by FRED, provide matrad_output to remove everything outside the body and avoid the couch interfering with the simulation
+convert_CT_to_mhd(mhd_file=mhd_file, dicom_dir=dicom_dir,
+                  image_size=uncropped_shape, matRad_output=matRad_output)
 
 final_shape = np.array(final_shape)
 washout_HU_regions = [-np.inf, -150, -30, 200, 1000, +np.inf]  # According to Parodi et al. 2007
@@ -132,14 +144,10 @@ for machine_data_i in range(machine_data.shape[1]):
 
 # Finding body mask
 cst = matRad_output['cst']
-body_indices = matRad_output['body_indices'].T[0]  # Before: body_indices = cst[4, 3][0][0].T[0]
+body_indices = matRad_output['body_indices'].T[0]
 body_indices -= 1  # 0-based indexing, from MATLAB to Python
 body_coords = np.unravel_index(body_indices, [uncropped_shape[2], uncropped_shape[1], uncropped_shape[0]])  # Convert to multi-dimensional form
 body_coords = (body_coords[1], body_coords[2], body_coords[0])  # Adjusting from MATLAB to Python
-
-# Offsets based on uncertainty from Schneider 2000
-# skeletal_offset = [0.8, 11.8, 0.9, 9.9, 0, 1.0, 0, 0, 0, 2.3, 0, 0, 0, 0]
-# soft_offset = [0.4, 5.8, 0, 5.6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]  # soft tissue
 
 HU_regions = [-1000, -950, -120, -83, -53, -23, 7, 18, 80, 120, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400, 1500, 2995, 2996]  # HU Regions
 max_param_deviation = 0.1 #deviation considered
@@ -160,7 +168,7 @@ CT_file_path = os.path.join(patient_folder, 'CT.raw')
 # CT_cropped HAS THE SHAPE OF THE CT CROPPED TO INCLUDE THE ENTIRE BODY, BUT THE FINAL CT USED
 # FOR THE SIMULATION IS CROPPED TO THE FINAL SHAPE, ONLY INCLUDING THE AREAS WHERE ACTIVITY AND DOSE ARE PRESENT
 # SO THE CT SAVED AT CT_npy_path IS MORE CROPPED THAN CT_cropped however ironic it is
-CT_cropped = crop_save_head_image(CT_file_path, is_CT_image=True, uncropped_shape=uncropped_shape,
+CT_cropped = crop_save_image(CT_file_path, is_CT_image=True, uncropped_shape=uncropped_shape,
                                     xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax)  # I need to save CT because I use it later
 np.save(os.path.join(npy_patient_folder, 'CT_cropped.npy'), CT_cropped)
 CT_npy_path = os.path.join(npy_patient_folder, 'CT.npy')
@@ -168,15 +176,6 @@ CT_raw_path = None  # os.path.join(dataset_folder, 'CT_cropped.raw')
 crop_save_npy(CT_cropped, CT_npy_path,
             raw_path=CT_raw_path, Trans=Trans, HL=final_shape//2)
 shutil.copy(CT_file_path, dataset_folder)
-
-### Uncomment for positron range effect
-# # Converting the CT to materials for the positron simulation:
-# positron_range_folder = os.path.join(script_dir, "../positron-range-correction")
-# materials_path = os.path.join(positron_range_folder, "GEO/MATERIAL.raw")
-# density_path = os.path.join(positron_range_folder, "GEO/DENSITY.raw")
-# positronCTtoMat(CT_cropped, hu2densities_path, materials_path, density_path)
-###
-# os.remove(CT_file_path)  # For FRED v 3.6
 
 # Generate the sensitivity for the reconstruction
 sensitivity_location = os.path.join(npy_patient_folder, 'sensitivity.npy')
@@ -279,7 +278,7 @@ for sobp_num in range(sobp_start, sobp_start + N_sobps):
                 pos_target_rotated[2]  + delta_y] + isocenter  # delta_y is added in the third dimension because we call y the superior inferior direction (head to feet), but the actual coordinate system is LPS (left-right, posterior-anterior, superior-inferior)
             pb_direction = pos_target_deviated - sourcePoint_field
             pb_direction = pb_direction / np.linalg.norm(pb_direction)
-            sourcePoint_bixel = pos_target_deviated - pb_direction * 8 ### # x cm from target to get out of the body
+            sourcePoint_bixel = pos_target_deviated - pb_direction * 8 # x cm from target to get out of the body
             for pb_energy in bixel[4][0]:
                 idx_closest = min(range(len(energy_array)), key=lambda energy_val: abs(energy_array[energy_val] - pb_energy))  # find closest energy to bixel energy
                 FWHM = FWHM_array[idx_closest]  # get FWHM for that energy
@@ -305,7 +304,7 @@ for sobp_num in range(sobp_start, sobp_start + N_sobps):
         # Dose
         # dose_file_path = os.path.join(mhd_folder_path, 'Dose.mhd')  # For FRED v 3.6
         dose_file_path = os.path.join(mhd_folder_path, 'Phantom.Dose.mhd')  # For FRED v 3.7
-        total_dose += crop_save_head_image(dose_file_path, uncropped_shape=uncropped_shape,
+        total_dose += crop_save_image(dose_file_path, uncropped_shape=uncropped_shape,
                             xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax,
                             crop_body=True, body_coords=body_coords, save_raw=save_raw)
 
@@ -318,29 +317,10 @@ for sobp_num in range(sobp_start, sobp_start + N_sobps):
         for isotope in isotope_list:
             # isotope_file_path = os.path.join(mhd_folder_path, f'{isotope}_scorer.mhd')  # For FRED v 3.6
             isotope_file_path = os.path.join(mhd_folder_path, f'Phantom.Activation_{isotope}.mhd')  # For FRED v 3.7
-            activation = crop_save_head_image(isotope_file_path,
+            activation = crop_save_image(isotope_file_path,
                                             xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax,
                                             uncropped_shape=uncropped_shape, save_raw=save_raw,
                                             crop_body=True, body_coords=body_coords)
-
-            ### COMMENT OUT TO SEE ITS EFFECT # Positron range effect. Move general part to beginning of script
-            # if isotope == 'C11' or isotope == 'N13' or isotope == 'O15':
-
-            #     shutil.copy(os.path.join(positron_range_folder, isotope, "espectro.txt"), os.path.join(positron_range_folder, "espectro.txt"))
-
-            #     activation_path = os.path.join(positron_range_folder, "GEO/ACTIVITY.raw")
-            #     activation_raw = activation.transpose(2, 1, 0)
-            #     activation_raw.tofile(activation_path)
-
-            #     # running positron simulator
-            #     command = ['./hibrido-positrones-v3.gpu', '1']  # 1 is for the GPU version, 0 for the CPU version
-            #     working_directory = os.path.join(script_dir, '../positron-range-correction')
-            #     input_file = os.path.join(working_directory, 'hybrid.in')
-            #     with open(input_file, 'r') as infile:
-            #         subprocess.run(command, stdin=infile, cwd=working_directory, text=True)
-
-            #     with open(os.path.join(working_directory, 'rango-acum.gpu.raw'), 'rb') as file:
-            #         activation = np.fromfile(file, dtype=np.float32).reshape(cropped_shape, order='F')  # activation including positron range effect
 
             for tissue_num, tissue in enumerate(field_factor_dict[isotope].keys()):
                 tissue_mask = (CT_cropped >= washout_HU_regions[tissue_num]) & (CT_cropped < washout_HU_regions[tissue_num + 1])
@@ -356,24 +336,10 @@ for sobp_num in range(sobp_start, sobp_start + N_sobps):
     with open(merged_raw_file, 'wb') as merged_file:
         pass  # Create an empty file to start with
 
-    ### WASHOUT CURVE
-    # tumor_indices = cst[32, 3][0][0].T[0]
-    # tumor_indices -= 1  # 0-based indexing, from MATLAB to Python
-    # tumor_coords = np.unravel_index(tumor_indices, [176, 272, 272])  # Convert to multi-dimensional form
-    # tumor_coords = (tumor_coords[1], tumor_coords[2], tumor_coords[0])  # Adjusting from MATLAB to Python
-    # tumor_mask = np.zeros(total_activity.shape, dtype=bool)
-    # tumor_mask[tumor_coords] = True
-    ###
 
     for isotope in isotope_list:
         activity_isotope = activity_isotope_dict[isotope]
         
-        ### WASHOUT CURVE: setting the activity to zero inside the tumor
-        # activity_isotope[tumor_coords] = 0  
-        # plt.figure()
-        # y_idx = 66
-        # plt.imshow(activity_isotope[:,y_idx, :], cmap="gray", alpha=0.6)
-        ###
         out_path = os.path.join(sobp_i_location, "phantom.vox")
         gen_voxel(CT_cropped, activity_isotope, out_path, hu2densities_path, nvox=cropped_shape, dvox=voxel_size/10)  # dvox in cm
         shutil.copy(mcgpu_input_location, sobp_i_location)  # copy the input file
@@ -399,52 +365,12 @@ for sobp_num in range(sobp_start, sobp_start + N_sobps):
             with open(os.path.join(sobp_i_location, "MCGPU_PET.psf.raw"), 'rb') as isotope_file:
                 merged_file.write(isotope_file.read())
 
-    #### WASHOUT_CURVE: adding into the merged file the detections inside the tumor
-    # for isotope in isotope_list:
-    #     activity_isotope = activity_isotope_dict[isotope]
-
-    #     activity_isotope[~tumor_mask] = 0  ### WASHOUT CURVE: setting the activity to zero outside the tumor
-    #     ###
-    #     plt.imshow(activity_isotope[:,y_idx, :], cmap="jet", alpha=0.6)
-    #     plt.savefig(os.path.join(script_dir, 'images/in_vs_out_tumor.png'))
-    #     ###
-        
-        
-    #     out_path = os.path.join(sobp_i_location, "phantom.vox")
-    #     gen_voxel(CT_cropped, activity_isotope, out_path, hu2densities_path, nvox=cropped_shape, dvox=voxel_size/10)  # dvox in cm
-    #     shutil.copy(mcgpu_input_location, sobp_i_location)  # copy the input file
-    #     os.rename(os.path.join(sobp_i_location, os.path.basename(mcgpu_input_location)), os.path.join(sobp_i_location, "MCGPU-PET.in"))  # renaming the input file from whatever name it had
-
-    #     # Modify the input file to include the isotope's mean life
-    #     input_path = os.path.join(sobp_i_location, f"MCGPU-PET.in")
-    #     with open(input_path, 'r') as file:
-    #         lines = file.readlines()
-    #     keyword = '# ISOTOPE MEAN LIFE'
-    #     for idx, input_line in enumerate(lines):
-    #         if keyword in input_line:
-    #             lines[idx] = ' ' + f'{mean_lives_no_washout[isotope]} ' + '# ISOTOPE MEAN LIFE'  ### mean life without washout
-    #     with open(input_path, 'w') as file:
-    #         file.writelines(lines)
-
-    #     # running mcgpu
-    #     command = [os.path.join(script_dir, './pet-simulation-reconstruction/mcgpu-pet/MCGPU-PET.x'), 'MCGPU-PET.in']
-    #     subprocess.run(command, cwd=sobp_i_location)
-
-    #     # Writing the raw file to a single file with the detections of all isotopes
-    #     with open(merged_raw_file, 'ab') as merged_file:
-    #         with open(os.path.join(sobp_i_location, "MCGPU_PET.psf.raw"), 'rb') as isotope_file:
-    #             merged_file.write(isotope_file.read())
-
-    # shutil.copy(merged_raw_file, os.path.join(script_dir, './pet-simulation-reconstruction/mcgpu-pet/washout_curve/experiment_1/MCGPU_PET.psf.raw'))
-
-    ####
-
     # Removing unnecessary files generated by MCGPU-PET
     os.remove(os.path.join(sobp_i_location, "MCGPU_PET.psf.raw"))
     os.remove(os.path.join(sobp_i_location, "phantom.vox"))
     os.remove(os.path.join(sobp_i_location, "Energy_Sinogram_Spectrum.dat"))
     os.remove(os.path.join(sobp_i_location, "MCGPU_PET.psf"))
-    os.remove(os.path.join(sobp_i_location, "MCGPU-PET.in"))
+    # os.remove(os.path.join(sobp_i_location, "MCGPU-PET.in")
 
     # Reconstruction with parallelproj
     reconstructed_activity = parallelproj_listmode_reconstruction(merged_raw_file,
@@ -452,7 +378,7 @@ for sobp_num in range(sobp_start, sobp_start + N_sobps):
                                                                   scanner=scanner, num_subsets=num_subsets, osem_iterations=osem_iterations,
                                                                   sensitivity_array=sensitivity_array)  # voxel_size in cm
 
-    # # Blurring simply with a Gaussian filter:
+    # # Blurring simply with a Gaussian filter instead of the PET reconstruction:
     # import cupy as cp
     # from cupyx.scipy.ndimage import gaussian_filter
     # sigma_blurring = 3.5 / 2.355 / voxel_size  # fwhm to sigma and mm to voxels
@@ -502,18 +428,3 @@ for sobp_num in range(sobp_start, sobp_start + N_sobps):
         os.remove(os.path.join(sobp_folder_location, "out/log/materials.txt"))
         os.remove(os.path.join(sobp_folder_location, "out/log/run.inp"))
         # os.remove(os.path.join(sobp_folder_location, "out/log/parsed.inp"))  # For FRED v 3.6
-
-
-# # Snippet to delete all HU lines:
-# n = 2379
-# with open(fred_input, 'r+') as file:
-#     lines = file.readlines()
-#     file.seek(0)
-#     file.truncate()
-#     file.writelines(lines[:-n])
-
-# Snippet to make CT.npy
-        # if file_path.endswith('CTHU.mhd'):
-        #     with open(file_path[:-3]+"raw", 'rb') as f:
-        #         dose = np.frombuffer(f.read(), dtype=np.float32).reshape(img_voxels, order='F')
-        #     np.save(os.path.join(npy_patient_folder, f'CT.npy'), dose)

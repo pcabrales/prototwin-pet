@@ -62,16 +62,18 @@ mc-gpu_dose.dat                 # OUTPUT VOXEL DOSE FILE NAME
 phantom.vox          # VOXEL GEOMETRY FILE (penEasy 2008 format; .gz accepted)
 
 
-#[SECTION MATERIAL FILE LIST v.2009-11-30]  
-/home/pablo/prototwin/deep-learning-dose-activity-dictionary/generate-dataset/pet-simulation-reconstruction/mcgpu-pet/materials/air_5-515keV.mcgpu.gz                          # 1
-/home/pablo/prototwin/deep-learning-dose-activity-dictionary/generate-dataset/pet-simulation-reconstruction/mcgpu-pet/materials/lung_ICRP110_5-515keV.mcgpu.gz                 # 2
-/home/pablo/prototwin/deep-learning-dose-activity-dictionary/generate-dataset/pet-simulation-reconstruction/mcgpu-pet/materials/adipose_ICRP110_5-515keV.mcgpu.gz              # 3
-/home/pablo/prototwin/deep-learning-dose-activity-dictionary/generate-dataset/pet-simulation-reconstruction/mcgpu-pet/materials/water_5-515keV.mcgpu.gz                        # 4
-/home/pablo/prototwin/deep-learning-dose-activity-dictionary/generate-dataset/pet-simulation-reconstruction/mcgpu-pet/materials/breast_glandular_ICRP110_5-515keV.mcgpu.gz     # 5
-/home/pablo/prototwin/deep-learning-dose-activity-dictionary/generate-dataset/pet-simulation-reconstruction/mcgpu-pet/materials/glands_others_ICRP110_5-515keV.mcgpu.gz        # 6
-/home/pablo/prototwin/deep-learning-dose-activity-dictionary/generate-dataset/pet-simulation-reconstruction/mcgpu-pet/materials/stomach_intestines_ICRP110_5-515keV.mcgpu.gz   # 7
-/home/pablo/prototwin/deep-learning-dose-activity-dictionary/generate-dataset/pet-simulation-reconstruction/mcgpu-pet/materials/muscle_ICRP110_5-515keV.mcgpu.gz               # 8
-/home/pablo/prototwin/deep-learning-dose-activity-dictionary/generate-dataset/pet-simulation-reconstruction/mcgpu-pet/materials/skin_ICRP110_5-515keV.mcgpu.gz                 # 9
-/home/pablo/prototwin/deep-learning-dose-activity-dictionary/generate-dataset/pet-simulation-reconstruction/mcgpu-pet/materials/spongiosa_ICRP110_5-515keV.mcgpu.gz            # 10
+# [SECTION MATERIAL FILE LIST v.2009-11-30]  
+# DO NOT CHANGE THE LINES BELOW:
+# generate_dataset.py automatically changes them based on the provided location for the materials file
+/air_5-515keV.mcgpu.gz                          # 1
+/lung_ICRP110_5-515keV.mcgpu.gz                 # 2
+/adipose_ICRP110_5-515keV.mcgpu.gz              # 3
+/water_5-515keV.mcgpu.gz                        # 4
+/breast_glandular_ICRP110_5-515keV.mcgpu.gz     # 5
+/glands_others_ICRP110_5-515keV.mcgpu.gz        # 6
+/stomach_intestines_ICRP110_5-515keV.mcgpu.gz   # 7
+/muscle_ICRP110_5-515keV.mcgpu.gz               # 8
+/skin_ICRP110_5-515keV.mcgpu.gz                 # 9
+/spongiosa_ICRP110_5-515keV.mcgpu.gz            # 10
 #
 # >>>> END INPUT FILE >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>

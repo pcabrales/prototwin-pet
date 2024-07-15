@@ -46,6 +46,7 @@ scanner = 'vision'  # only scanner implemented so far
 mcgpu_location = os.path.join(script_dir, './pet-simulation-reconstruction/mcgpu-pet')
 mcgpu_input_location = os.path.join(mcgpu_location, f"MCGPU-PET-{scanner}.in")
 mcgpu_executable_location = os.path.join(mcgpu_location, 'MCGPU-PET.x')
+materials_path = os.path.join(mcgpu_location, "materials")
 #
 # PET RECONSTRUCTION
 num_subsets=2

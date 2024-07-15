@@ -1,5 +1,7 @@
 import random
+import csv
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 from tqdm import tqdm
 import numpy as np
@@ -17,7 +19,7 @@ font_path = '/usr/share/fonts/truetype/msttcorefonts/Times_New_Roman.ttf'
 font_manager.fontManager.addfont(font_path)
 import pymedphys
 from collections import Counter
-import pickle
+import torch
 
 def set_seed(seed):
     """
@@ -99,7 +101,8 @@ class DoseActivityDataset(Dataset):
         
         return input_volume, output_volume, beam_energy
     
-    # Creating a dataset for the dose/activity input/output pairs
+    
+# Creating a dataset for the dose/activity input/output pairs
 class SOBPDoseActivityDataset(Dataset):
     """
     Create the dataset where the activity is the input and the dose is the output.
@@ -114,10 +117,9 @@ class SOBPDoseActivityDataset(Dataset):
         self.joint_transform = joint_transform  # Transforms applied to both input and output images
         self.deviations_dict = deviations_dict  # Dictionary including the energy for each beam in keV
         self.file_names = os.listdir(input_dir)[:num_samples]  # Only selecting as many files as given by num_samples
-        ###
+        
         self.CT_flag = CT_flag  # Flag indicating whether the set will include the CT as a second channel to train the nets
         self.CT = (CT - np.mean(CT)) / np.std(CT)
-        ###
         
         
     def __len__(self):
@@ -147,191 +149,14 @@ class SOBPDoseActivityDataset(Dataset):
         else:
             deviations = np.nan
             
-        ###
+        
         if self.CT_flag:
             input_volume = torch.cat((input_volume, torch.tensor(self.CT, dtype=torch.float32).unsqueeze(0)))
-        ###    
+            
             
         return input_volume, output_volume, deviations
     
-# Creating a dataset for the low statistics / high statistics or low statistics / low statistics pairs
-class SuperResolutionDataset(Dataset):
-    """
-    Create the dataset where the low resolution activity is the input and the high or low resolution is the output.
-    The relevant transforms are applied. To use Noise2Noise (lowres to lowres for training), provide a lowres_dir_2
-    """
-    def __init__(self, lowres_dirs, highres_dir=None, num_samples=5, lowres_transform=None, highres_transform=None, 
-                 joint_transform=None, CT_flag=False, CT=None, energy_beam_dict=None, training_n2n=False):
-        self.lowres_dirs = lowres_dirs
-        self.lowres_transform = lowres_transform
-        self.training_n2n = training_n2n
-        if not training_n2n:
-            self.highres_dir = highres_dir
-            self.highres_transform = highres_transform
-        self.joint_transform = joint_transform  # Transforms applied to both input and output images
-        self.energy_beam_dict = energy_beam_dict  # Dictionary including the energy for each beam in keV
-        self.file_names = os.listdir(self.lowres_dirs[0])[:num_samples]  # Only selecting as many files as given by num_samples
-        
-    def __len__(self):
-        return len(self.file_names)
-
-    def __getitem__(self, idx):
-        # Load activity and dose images (numpy arrays)
-        lowres_volumes = []
-        
-        for lowres_dir in self.lowres_dirs:
-            volume = np.load(os.path.join(lowres_dir, self.file_names[idx]))
-            lowres_volumes.append(torch.tensor(volume, dtype=torch.float32).unsqueeze(0))
-           
-        if not self.training_n2n:
-            highres_volume = np.load(os.path.join(self.highres_dir, self.file_names[idx]))
-            highres_volume = torch.tensor(highres_volume, dtype=torch.float32).unsqueeze(0)
-        else:
-            highres_volume = []
-
-        # Apply transforms
-        if self.joint_transform:
-            if not self.training_n2n:
-                all_volumes = lowres_volumes + [highres_volume]
-                all_volumes = self.joint_transform(*all_volumes)
-                lowres_volumes = all_volumes[:-1]
-                highres_volume = all_volumes[-1]   
-            else:
-                lowres_volumes = self.joint_transform(*lowres_volumes)
-            
-        if self.lowres_transform:
-            for i in range(len(lowres_volumes)):
-                lowres_volumes[i] = self.lowres_transform(lowres_volumes[i])
-                
-        if not self.training_n2n and self.highres_transform:
-            highres_volume = self.highres_transform(highres_volume) 
-            
-        if self.energy_beam_dict is not None:
-            beam_number = self.file_names[idx][:4]
-            beam_energy = self.energy_beam_dict.get(beam_number, 0.0)  # If the energy is not in the dictionary, set to 0
-            beam_energy = float(beam_energy) / 1000  # from keV to MeV
-        else: 
-            beam_energy = np.nan
-        
-        return lowres_volumes, highres_volume, float(beam_number)
-
-
-# Creating a dataset for the low statistics / high statistics or low statistics / low statistics pairs
-class SOBPSuperResolutionDataset(Dataset):
-    """
-    Create the dataset where the combination of random beams is generated
-    """
-    def __init__(self, lowres_dir_1, highres_dir=None, lowres_dir_2=None, num_samples=5, lowres_transform=None, highres_transform=None, 
-                 joint_transform=None, CT_flag=False, CT=None, energy_beam_dict=None, weights_dir="../prototwin/activity-super-resolution/data/numbers-sobp.dat",
-                 training_set=False, test_set=False, SOBP_complete=False, histories_factor=100):
-        self.input_dir = lowres_dir_1
-        self.num_samples = num_samples
-        self.input_transform = lowres_transform
-        if lowres_dir_2 is not None and highres_dir is None:
-            self.output_transform = lowres_transform
-            self.output_dir = lowres_dir_2
-            self.factor = 1  # Factor to multiply the output by related to the difference in histories
-        else:
-            self.output_dir = highres_dir
-            self.output_transform = highres_transform
-            self.factor = histories_factor
-        self.joint_transform = joint_transform  # Transforms applied to both input and output images
-        self.energy_beam_dict = energy_beam_dict  # Dictionary including the energy for each beam in keV
-        self.file_names = os.listdir(self.input_dir)[:num_samples]  # Only selecting as many files as given by num_samples
-          
-        self.CT_flag = CT_flag  # Flag indicating whether the set will include the CT as a second channel to train the nets
-        self.CT = CT
-        
-        # SOBP weights
-        weights_csv = pd.read_csv(weights_dir, delimiter='\s+', header=None)
-        self.weights_dict = dict(zip(weights_csv[0], weights_csv[1]))
-        
-        if SOBP_complete:
-            self.low_bound_num_beams = 1
-        else:
-            self.low_bound_num_beams = int(self.num_samples * 0.1)
-        
-    def __len__(self):
-        return len(self.file_names)
-
-    def __getitem__(self, idx):
-        torch.manual_seed(idx)
-        num_beams_sobp = torch.randint(self.low_bound_num_beams, self.num_samples + 1, (1,)).item()  # Calculate number of beams making up the SOBP
-        indices = torch.randperm(self.num_samples)[:num_beams_sobp]  # Get random indices
-        input_volume = 0
-        output_volume = 0
-        total_weight = 0
-        for idx in indices:
-            beam_number = self.file_names[idx][:4]
-            weight_beam = self.weights_dict[float(beam_number)]  # Building the SOBP from the weights
-            total_weight += weight_beam
-            # Load activity and dose images (numpy arrays)
-            input_volume += weight_beam * np.load(os.path.join(self.input_dir, self.file_names[idx]))
-            output_volume += weight_beam * np.load(os.path.join(self.output_dir, self.file_names[idx]))
-
-        # Convert numpy arrays to PyTorch tensors, standardising by the number of beams
-        input_volume = 1 / total_weight * torch.tensor(input_volume, dtype=torch.float32).unsqueeze(0)
-        output_volume = 1 / total_weight *  torch.tensor(output_volume, dtype=torch.float32).unsqueeze(0)
-
-        if self.input_transform:
-            input_volume = self.input_transform(input_volume)
-        if self.output_transform:
-            output_volume = self.output_transform(output_volume)
-        # Apply transforms
-        if self.joint_transform:
-            input_volume, output_volume = self.joint_transform(input_volume, output_volume)
-        if self.CT_flag:
-            input_volume = torch.cat((input_volume, torch.tensor(self.CT, dtype=torch.float32).unsqueeze(0)))  # Placing the CT as a second input channel
-            
-        return input_volume, output_volume, idx, 0, 1
     
-
-    # Creating a dataset for the dose/activity input/output pairs
-class ProgressiveDenoisingDataset(Dataset):
-    """
-    Create the dataset where the activity is the input and the dose is the output.
-    The relevant transforms are applied.
-    """
-    def __init__(self, input_dir, output_dir, num_samples=5, input_transform=None, output_transform=None, 
-                 joint_transform=None, energy_beam_dict=None, t=-1):
-        self.input_dir = input_dir
-        self.output_dir = output_dir
-        self.input_transform = input_transform
-        self.output_transform = output_transform
-        self.joint_transform = joint_transform  # Transforms applied to both input and output images
-        self.file_names = os.listdir(input_dir)[:num_samples]  # Only selecting as many files as given by num_samples
-        self.energy_beam_dict = energy_beam_dict  # Dictionary including the energy for each beam in keV
-        self.t = torch.tensor(t)   # t=-1 if not specified
-
-    def __len__(self):
-        return len(self.file_names)
-
-    def __getitem__(self, idx):
-        # Load activity and dose images (numpy arrays)
-        input_volume = np.load(os.path.join(self.input_dir, self.file_names[idx]))
-        output_volume = np.load(os.path.join(self.output_dir, self.file_names[idx]))
-
-        # Convert numpy arrays to PyTorch tensors
-        input_volume = torch.tensor(input_volume, dtype=torch.float32).unsqueeze(0)
-        output_volume = torch.tensor(output_volume, dtype=torch.float32).unsqueeze(0)
-
-        # Apply transforms
-        if self.input_transform:
-            input_volume = self.input_transform(input_volume)
-        if self.output_transform:
-            output_volume = self.output_transform(output_volume)
-        if self.joint_transform:
-            input_volume, output_volume = self.joint_transform(input_volume, output_volume)
-        if self.energy_beam_dict is not None:
-            beam_number = self.file_names[idx][:4]
-            beam_energy = self.energy_beam_dict.get(beam_number, 0.0)  # If the energy is not in the dictionary, set to 0
-            beam_energy = float(beam_energy) / 1000  # from keV to MeV
-        else: 
-            beam_number = np.nan
-            
-        return input_volume, output_volume, self.t  ###, beam_number
-
-
 # Function to get means, standard deviations, minimum and maximum values of the selected data for a given number of samples (num_samples)
 def dataset_statistics(image_dir, scaling='standard', num_samples=5, joint_transform=None):
     dataset = DoseActivityDataset(input_dir=image_dir, output_dir=image_dir, num_samples=num_samples, joint_transform=joint_transform)
@@ -353,7 +178,7 @@ def dataset_statistics(image_dir, scaling='standard', num_samples=5, joint_trans
     elif scaling == 'robust':
         median_image = torch.median(image_data)
         image_data = image_data.flatten().numpy()
-        iqr_image = np.quantile(image_data, 0.75) - np.quantile(image_data, 0.25)  ###
+        iqr_image = np.quantile(image_data, 0.75) - np.quantile(image_data, 0.25)  
         print(f'Median input pixel value: {median_image:0.11f}')
         print(f'Interquartile range of the input pixel values: {iqr_image:0.21f}')
         return [median_image, iqr_image]
@@ -384,8 +209,7 @@ def shuffled_loaders(datasets, batch_size, shuffle=True, num_workers=1):
     return loaders
 
 
-# CUSTOM TRANSFORMS
-
+# CUSTOM TRANSFORMS:
 # Class to apply the same transform **in the same way** to an array of volumes
 class JointCompose:
     def __init__(self, transforms):
@@ -401,6 +225,7 @@ class JointCompose:
             transformed_volumes.append(volume)
         return transformed_volumes
 
+
 # Class to add an inverse method for each transform
 class CustomNormalize(transforms.Normalize):
     def __init__(self, mean, std):
@@ -412,6 +237,7 @@ class CustomNormalize(transforms.Normalize):
         tensor = tensor.mul(self.std).add(self.mean)
         return tensor
 
+
 # Min max normalize for our Numpy arrays (dose/activity images)
 # Torchvision transforms do not work on floating point numbers, 
 class MinMaxNormalize:
@@ -420,6 +246,7 @@ class MinMaxNormalize:
         self.max_tensor = max_tensor
     def __call__(self, img):
         return (img - self.min_tensor)/(self.max_tensor - self.min_tensor)
+
 
 # Gaussian blurring the image
 class GaussianBlurFloats:
@@ -543,11 +370,11 @@ class GaussianBlob:
         ax = torch.arange(-self.size // 2 + 1., self.size // 2 + 1.)
         xx, yy, zz = torch.meshgrid(ax, ax, ax)
         kernel = 0.5 * max_overall * torch.exp(-(xx**2 + yy**2 + zz**2) / (2 * self.sigma**2))
-        ###
+        
         idx_max_overall = list(idx_max_overall)
         idx_max_overall[1] = 16
         idx_max_overall = tuple(idx_max_overall)
-        ###
+        
         
         center = (random.randint(bp_position, img.shape[0] - 1), idx_max_overall[1], idx_max_overall[2])
         # Find the start and end indices for slicing
@@ -632,7 +459,6 @@ class StreakingArtifacts:
         return streaky_tensor
 
 
-
 # CUSTOM LOSSES
 # Relative mse
 def rel_mse_loss(output, target, mean_output=0, std_output=1):  # Relative error loss
@@ -661,12 +487,14 @@ def psnr(output, target):
     mse = torch.mean((target - output) ** 2, dim=(1, 2, 3)) 
     return 20 * torch.log10(max_pixel / torch.sqrt(mse))
 
+
 def manual_permute(tensor, dims):
     for i in range(len(dims)):
         if i != dims[i]:
             tensor = tensor.transpose(i, dims[i])
             dims = [dims.index(j) if j == i else j for j in dims]
     return tensor
+
 
 def post_BP_loss(output, target, device="cpu", mean_output=0, std_output=1):
     output = output.squeeze(1)  # Eliminate channel dim
@@ -853,6 +681,7 @@ def gamma_index(output, target, tolerance=0.03, beta=5, threshold=0.2):
 def sigmoid(x, beta):
     return 1 / (1 + torch.exp(-beta * x))
 
+
 # for a precise calculation of the gamma index, we use the pymedphys library 
 def pymed_gamma(batch_output, batch_target, dose_percent_threshold, distance_mm_threshold, threshold, mm_per_voxel, mean_output=0, std_output=1, random_subset=None):
     for idx in range(batch_target.shape[0]):
@@ -878,6 +707,7 @@ def pymed_gamma(batch_output, batch_target, dose_percent_threshold, distance_mm_
         valid_gamma = gamma[~np.isnan(gamma)]
         pass_ratio = np.sum(valid_gamma <= 1) / len(valid_gamma)
     return pass_ratio, torch.tensor(valid_gamma)
+
 
 # Correcting the indexing error and implementing the cubic interpolation for 2D y array
 def torch_cubic_interp1d_2d(x, y, x_new):
@@ -1027,7 +857,7 @@ def plot_slices(trained_model, loader, device, CT_flag=False, CT_manual=None, me
             target_img = target_img[:,:,num_slice]
         elif plane == 'y':
             axes_reference = (mm_per_voxel[0] * np.arange(output.shape[2]), mm_per_voxel[2] * np.arange(output.shape[4]))    
-            num_slice = input_img.shape[1] // 2 + 5 ###  idcs_max_target[1]###
+            num_slice = idcs_max_target[1]
             input_img = input_img[:,num_slice,:]
             input_img = torch.flip(input_img, dims=[1])
             out_img = out_img[:,num_slice,:]
@@ -1056,16 +886,16 @@ def plot_slices(trained_model, loader, device, CT_flag=False, CT_manual=None, me
             distance_mm_threshold = distance_mm_threshold, 
             lower_percent_dose_cutoff=threshold)
         
-        valid_gamma = gamma_img[~np.isnan(gamma_img)] ###
-        pass_ratio = np.sum(valid_gamma <= 1) / len(valid_gamma)  ###
-        print("Pass ratio for sample ", idx, " is: ", pass_ratio)  ###
-        print("AFTER GAMMA CALCULATION")  ###
-        gamma_img = (gamma_img < 1.0) & (~np.isnan(gamma_img))  ### plot only the gamma values above 1.0 (not passing)
+        valid_gamma = gamma_img[~np.isnan(gamma_img)] 
+        pass_ratio = np.sum(valid_gamma <= 1) / len(valid_gamma)  
+        print("Pass ratio for sample ", idx, " is: ", pass_ratio)  
+        print("AFTER GAMMA CALCULATION")  
+        gamma_img = (gamma_img < 1.0) & (~np.isnan(gamma_img))  # plot only the gamma values above 1.0 (not passing)
         gamma_img = gamma_img.astype(np.int8)
 
         diff_img = abs(target_img - out_img)
         if CT_flag:
-            # mask = np.where(target_img > 0.1 * torch.max(target_img), 0.8, 0.0)  # Masking 0 values to be able to see the CT ###
+            # mask = np.where(target_img > 0.1 * torch.max(target_img), 0.8, 0.0)  # Masking 0 values to be able to see the CT 
             mask_input = ((input_img - torch.min(input_img)) / (torch.max(input_img) - torch.min(input_img))).numpy() * 1.4
             mask_out = ((out_img - torch.min(out_img)) / (torch.max(out_img) - torch.min(out_img))).numpy() * 1.4
             mask_target = ((target_img - torch.min(target_img)) / (torch.max(target_img) - torch.min(target_img))).numpy() * 1.4
@@ -1203,7 +1033,7 @@ def plot_sample(trained_model, loader, device, planned_dose, CT_flag=False, CT_m
         planned_dose = planned_dose / np.max(planned_dose) * max_dose
     
     # To Bq
-    PET_scaled = PET_scaled / torch.max(PET_scaled)  * max_activity  ### found with the equation for A(to): ###
+    PET_scaled = PET_scaled / torch.max(PET_scaled)  * max_activity  ### found with the equation for A(to): 
     # TO GET ACTIVITY IN Bq
     # print("Activity factor (multiply by max of activation image for each isotope and by sensitivity of the scanner (0.05) and add them up to geit initial activity in Bq to scale the activation image)")
     # print('C11: ', lambda_dict['C10'] / 60 * np.exp(-lambda_dict['C10'] * initial_time))
@@ -1273,7 +1103,7 @@ def plot_sample(trained_model, loader, device, planned_dose, CT_flag=False, CT_m
     print(f"\n############################################### \
           \nPass test for planned vs actual is: {pass_ratio:.5f} \
           \n###############################################\n")
-    gamma_img = (gamma_img < 1.0) & (~np.isnan(gamma_img))  ### plot only the gamma values above 1.0 (not passing)
+    gamma_img = (gamma_img < 1.0) & (~np.isnan(gamma_img))  # plot only the gamma values above 1.0 (not passing)
     gamma_img_planned_actual  = gamma_img.astype(np.int8)
     
     # Actual vs Estimated
@@ -1288,12 +1118,12 @@ def plot_sample(trained_model, loader, device, planned_dose, CT_flag=False, CT_m
     print(f"\n##################################################\
           \nPass test for actual vs estimated is: {pass_ratio:.5f} \
           \n##################################################\n")
-    gamma_img = (gamma_img < 1.0) & (~np.isnan(gamma_img))  ### plot only the gamma values above 1.0 (not passing)
+    gamma_img = (gamma_img < 1.0) & (~np.isnan(gamma_img))  # plot only the gamma values above 1.0 (not passing)
     gamma_img_actual_estimated = gamma_img.astype(np.int8)
         
     
     if CT_flag:
-        # mask = np.where(actual_dose_img > 0.1 * torch.max(actual_dose_img), 0.8, 0.0)  # Masking 0 values to be able to see the CT ###
+        # mask = np.where(actual_dose_img > 0.1 * torch.max(actual_dose_img), 0.8, 0.0)  # Masking 0 values to be able to see the CT 
         mask_PET = ((PET_img - torch.min(PET_img)) / (torch.max(PET_img) - torch.min(PET_img))).numpy() * 1.4
         mask_estimated_dose = ((estimated_dose_img - torch.min(estimated_dose_img)) / (torch.max(estimated_dose_img) - torch.min(estimated_dose_img))).numpy() * 1.4
         mask_planned_dose = ((planned_dose_img - torch.min(planned_dose_img)) / (torch.max(planned_dose_img) - torch.min(planned_dose_img))).numpy() * 1.4
@@ -1316,7 +1146,7 @@ def plot_sample(trained_model, loader, device, planned_dose, CT_flag=False, CT_m
             CT_idx = np.flip(CT_idx, axis=1).T
             
         for plot_column in range(num_cols):
-            axs[plot_column].imshow(np.flipud(CT_idx).T, cmap='gray', vmin=vmin_CT, vmax=vmax_CT , alpha=0.99)  ### vmin and vmax modified to see PET
+            axs[plot_column].imshow(np.flipud(CT_idx).T, cmap='gray', vmin=vmin_CT, vmax=vmax_CT , alpha=0.99)  # vmin and vmax modified to see PET
         
     else:    
         mask_PET = np.ones_like(PET_img).astype(float)  # Leave all if no CT is provided
@@ -1537,6 +1367,7 @@ def get_input_output_target(trained_model, loader, device, num_steps=1):
         third_output = torch.cat((third_output, third_output_i))
     return input, output, target, third_output
 
+
 def apply_model_to_patches(trained_model, input, target, patch_size):
     # Initialize an empty tensor to hold the reconstructed image
     reconstructed_input = torch.zeros_like(input)
@@ -1576,323 +1407,6 @@ def apply_model_to_patches(trained_model, input, target, patch_size):
         reconstructed_target[:, x:x+patch_size, y:y+patch_size, z:z+patch_size] = target_patch
 
     return reconstructed_input, reconstructed_output, reconstructed_target
-
-
-def back_and_forth(act2dose_model, dose2act_model, blob_loader, non_blob_loader, device, reconstruct_dose=False,
-                   num_cycles=1, mean_act=0, std_act=1, mean_dose=0, std_dose=1, hist_plot_dir="images/B&F-hist.jpg",
-                   slice_plot_dir="images/B&F.jpg", idx=0):
-    # If dose is set to true, then the dose image is converted to activity and back to dose again.
-    # If it is set to False, that is done instead for activity images.
-    # num_cycles defined the number of times that the cycle is applied
-    # idx controls the loader example to show
-
-    # Loading a few examples
-    iter_loader = iter(blob_loader)
-    act, dose, _ = next(iter_loader)
-    dose_original = dose.detach().cpu()
-    act_original = act.detach().cpu()
-    
-    iter_loader = iter(non_blob_loader)
-    non_blob_act, non_blob_dose, _ = next(iter_loader)
-    non_blob_dose_original = non_blob_dose.detach().cpu()
-    non_blob_act_original = non_blob_act.detach().cpu()
-    torch.cuda.empty_cache()  # Freeing up RAM 
-    
-    dose2act_model.eval()  # Putting the model in validation mode
-    act2dose_model.eval()  # Putting the model in validation mode
-    
-    for i in range(num_cycles):
-        if reconstruct_dose:
-            act = dose2act_model(dose.to(device))
-            dose = act2dose_model(act)
-            dose = dose.detach().cpu()
-            torch.cuda.empty_cache()  # Freeing up RAM 
-            non_blob_act = dose2act_model(non_blob_dose.to(device))
-            non_blob_dose = act2dose_model(non_blob_act)
-            non_blob_dose = non_blob_dose.detach().cpu()
-            torch.cuda.empty_cache()  # Freeing up RAM 
-            
-        else:
-            dose = act2dose_model(act.to(device))
-            act = dose2act_model(dose)
-            act = act.detach().cpu()  
-            non_blob_dose = act2dose_model(non_blob_act.to(device))
-            non_blob_act = dose2act_model(non_blob_dose)
-            non_blob_act = non_blob_act.detach().cpu()  
-            torch.cuda.empty_cache()  # Freeing up RAM 
-    
-    # while dose.shape[0] < 3:
-    #     # If the batch size is 1 or 2, load more examples
-    #     act_i, dose_i, _ = next(iter_loader)
-    #     dose_i_original = dose.detach().cpu()
-    #     act_i_original = act.detach().cpu()
-    #     torch.cuda.empty_cache()  # Freeing up RAM 
-    #     for i in range(num_cycles):
-    #         if reconstruct_dose:
-    #             act_i = dose2act_model(dose.to(device))
-    #             act_i = act.detach().cpu()  
-    #             torch.cuda.empty_cache()  # Freeing up RAM 
-    #             dose_i = act2dose_model(act.to(device))
-    #             dose_i = dose_i.detach().cpu()
-    #             torch.cuda.empty_cache()  # Freeing up RAM 
-    #         else:
-    #             dose_i = act2dose_model(act.to(device))
-    #             dose_i = dose_i.detach().cpu()
-    #             torch.cuda.empty_cache()  # Freeing up RAM 
-    #             act_i = dose2act_model(dose.to(device))
-    #             act_i = act_i.detach().cpu()  
-    #             torch.cuda.empty_cache()  # Freeing up RAM 
-        
-    #     dose = torch.cat((dose, dose_i))
-    #     dose_original = torch.cat((dose_original, dose_i_original))
-    #     act = torch.cat((act, act_i))
-    #     act_original = torch.cat((act_original, act_i_original))
-    
-    # Slice comparison
-    sns.set()
-    font_size = 26
-    plt.rcParams['font.family'] = 'serif'
-    plt.rcParams['font.serif'] = 'Times New Roman'
-    fig, axs = plt.subplots(2, 3, figsize=[20, 12])
-    y_slice = dose.shape[3] // 2
-    
-    if reconstruct_dose:
-        reconstruced_imgs = mean_dose + dose * std_dose  # undoing normalization
-        original_imgs = mean_dose + dose_original * std_dose  # undoing normalization
-        non_blob_reconstruced_imgs = mean_dose +  non_blob_dose * std_dose  # undoing normalization
-        non_blob_original_imgs = mean_dose +  non_blob_dose_original * std_dose  # undoing normalization
-
-        axs[0, 0].set_title("Original dose", fontsize=font_size)
-        title_reconstructed = "Reconstructed dose after " + str(num_cycles) + " cycle(s)"
-
-    else:
-        reconstruced_imgs = mean_act + act * std_act  # undoing normalization
-        original_imgs = mean_act + act_original * std_act  # undoing normalization
-        non_blob_reconstruced_imgs = mean_act + non_blob_act * std_act  # undoing normalization
-        non_blob_original_imgs = mean_act + non_blob_act_original * std_act  # undoing normalization
-
-        axs[0, 0].set_title("Original activity", fontsize=font_size)
-        title_reconstructed = "Activity after " + str(num_cycles) + " cycle(s)"
-        
-    axs[0, 1].set_title(title_reconstructed, fontsize=font_size)
-    axs[0, 2].set_title("|Reconstructed - Original|", fontsize=font_size)
-        
-    # Blobbed image
-    original_img = original_imgs[idx].squeeze(0).squeeze(0)
-    reconstructed_img = reconstruced_imgs[idx].squeeze(0).squeeze(0)
-    diff_img = abs(reconstructed_img - original_img)
-    c1 = axs[0, 0].imshow(np.flipud(original_img[:,y_slice,:]).T, cmap='jet', aspect='auto')
-    axs[0, 0].set_xticks([])
-    axs[0, 0].set_yticks([])
-    c2 = axs[0, 1].imshow(np.flipud(reconstructed_img[:,y_slice,:]).T, vmax=torch.max(original_img), cmap='jet', aspect='auto')
-    axs[0, 1].set_xticks([])
-    axs[0, 1].set_yticks([])
-    
-    
-    threshold_diff = 0.1 ###
-    ### Apply mask to the difference image
-    # diff_img[diff_img > threshold_diff] = torch.max(original_img) 
-    ###
-    
-    
-    axs[0, 2].imshow(np.flipud(diff_img[:,y_slice,:]).T, cmap='jet', vmax=torch.max(original_img), aspect='auto')
-    axs[0, 2].set_xticks([])
-    axs[0, 2].set_yticks([])
-    
-    # Non-Blobbed image
-    non_blob_original_img = non_blob_original_imgs[idx].squeeze(0).squeeze(0)
-    non_blob_reconstructed_img = non_blob_reconstruced_imgs[idx].squeeze(0).squeeze(0)
-    non_blob_diff_img = abs(non_blob_reconstructed_img - non_blob_original_img)
-    
-    ### Apply mask to the difference image
-    # non_blob_diff_img[non_blob_diff_img > threshold_diff] = torch.max(original_img) 
-    ###
-    
-    c1 = axs[1, 0].imshow(np.flipud(non_blob_original_img[:,y_slice,:]).T, vmax=torch.max(original_img), cmap='jet', aspect='auto')
-    axs[1, 0].set_xticks([])
-    axs[1, 0].set_yticks([])
-    c2 = axs[1, 1].imshow(np.flipud(non_blob_reconstructed_img[:,y_slice,:]).T, vmax=torch.max(original_img), cmap='jet', aspect='auto')
-    axs[1, 1].set_xticks([])
-    axs[1, 1].set_yticks([])
-    axs[1, 2].imshow(np.flipud(non_blob_diff_img[:,y_slice,:]).T, cmap='jet', vmax=torch.max(original_img), aspect='auto')
-    axs[1, 2].set_xticks([])
-    axs[1, 2].set_yticks([])
-    
-    text_1 = "Non-Distorted"
-    text_2 = "Distorted"
-
-    fig.text(0.0, 0.25, text_1, va='center', rotation='vertical', fontsize=font_size)#, fontstyle='italic')
-    fig.text(0.0, 0.75, text_2, va='center', rotation='vertical', fontsize=font_size)#, fontstyle='italic')
-    
-    cbar_ax = fig.add_axes([0.02, 0.01, 0.97, 0.03])
-    cbar = fig.colorbar(c2, cax=cbar_ax, orientation='horizontal')
-    cbar.set_label(label='Activity or dose (units)', size=font_size)
-    cbar.ax.tick_params(labelsize=font_size)
-
-    fig.tight_layout()
-    fig.subplots_adjust(bottom=0.06, left=0.03)
-    fig.savefig(slice_plot_dir, dpi=300, bbox_inches='tight')
-    fig.savefig(slice_plot_dir[:-3] + "eps", format='eps', bbox_inches='tight')
-    
-    # Histogram comparison
-    plt.figure(figsize=(10, 6))
-    sns.histplot(diff_img[diff_img>0.02].flatten(), color="red", label="Distorted", kde=True)
-    sns.histplot(non_blob_diff_img[diff_img>0.02].flatten(), color="skyblue", label="Non-Distorted", kde=True)
-    plt.title("Histogram of |Original - Reconstructed| Activity Pixels")
-    plt.xlabel("Activity (units)")
-    plt.ylabel("Frequency")
-    plt.savefig(hist_plot_dir, dpi=300, bbox_inches='tight')
-    plt.savefig(hist_plot_dir[:-3] + "eps", format='eps', bbox_inches='tight')
-    
-    return None
-
-
-def test_back_and_forth(act2dose_model, dose2act_model, blob_loader, non_blob_loader, device,
-                   num_cycles=1, mean_act=0, std_act=1, mean_dose=0, std_dose=1, hist_plot_dir="images/B&F-hist.jpg"):
-    # removed reconstruct_dose parameter, can simply invert the input and output, made it more confusing
-    # num_cycles defined the number of times that the cycle is applied
-    
-    l2_loss = nn.MSELoss(reduction='none')
-    l2_loss_list = []
-    non_blob_l2_loss_list = []
-    l2_loss_list_std = []
-    non_blob_l2_loss_list_std = []
-
-    with torch.no_grad():
-        for (act, _, _), (non_blob_act, _, _) in tqdm(zip(blob_loader, non_blob_loader)):
-            # Loading a few examples
-            act_original = act.detach().cpu()
-            non_blob_act_original = non_blob_act.detach().cpu()
-            torch.cuda.empty_cache()  # Freeing up RAM
-            
-            for i in range(num_cycles):
-                dose = act2dose_model(act.to(device))
-                act = dose2act_model(dose)
-                act = act.detach().cpu()  
-                non_blob_dose = act2dose_model(non_blob_act.to(device))
-                non_blob_act = dose2act_model(non_blob_dose)
-                non_blob_act = non_blob_act.detach().cpu()  
-                torch.cuda.empty_cache()  # Freeing up RAM 
-    
-            reconstruced_imgs = mean_act + act * std_act  # undoing normalization
-            original_imgs = mean_act + act_original * std_act  # undoing normalization
-            non_blob_reconstruced_imgs = mean_act + non_blob_act * std_act  # undoing normalization
-            non_blob_original_imgs = mean_act + non_blob_act_original * std_act  # undoing normalization
-            
-            l2_loss_list.append(l2_loss(reconstruced_imgs, original_imgs).mean().item())
-            non_blob_l2_loss_list.append(l2_loss(non_blob_reconstruced_imgs, non_blob_original_imgs).mean().item())
-            l2_loss_list_std.append(l2_loss(reconstruced_imgs, original_imgs).std().item())
-            non_blob_l2_loss_list_std.append(l2_loss(non_blob_reconstruced_imgs, non_blob_original_imgs).std().item())
-    
-    l2_loss_list = torch.tensor(l2_loss_list)
-    non_blob_l2_loss_list = torch.tensor(non_blob_l2_loss_list)
-    l2_loss_list_std = torch.tensor(l2_loss_list_std)
-    non_blob_l2_loss_list_std = torch.tensor(non_blob_l2_loss_list_std)
-    text_results = f"L2 Loss (with distortion): {torch.mean(l2_loss_list)} +- {torch.mean(l2_loss_list_std)}\n" \
-        f"L2 Loss (without distortion): {torch.mean(non_blob_l2_loss_list)} +- {torch.mean(non_blob_l2_loss_list_std)}" 
-    print(text_results)
-    
-    font_size = 26
-    bin_width = 0.00002  # bin_width = 0.00005
-    # Histogram comparison
-    plt.rcParams['font.family'] = 'serif'
-    plt.rcParams['font.serif'] = 'Times New Roman'
-    plt.figure(figsize=(10, 6))
-    plt.xticks(fontsize=font_size, rotation=45)
-    plt.yticks(fontsize=font_size)
-    sns.histplot(l2_loss_list.cpu().numpy().flatten(), color="red", alpha=0.75, label="Distorted", binwidth=bin_width)
-    sns.histplot(non_blob_l2_loss_list.cpu().numpy().flatten(), color="skyblue", alpha=0.75, label="Non-Distorted", binwidth=bin_width)
-    plt.title("Histogram of Mean Image MSE(Original, Reconstructed)", fontsize=font_size)
-    plt.xlabel("Activity (units)", fontsize=font_size)
-    plt.ylabel("Frequency", fontsize=font_size)
-    plt.legend(fontsize=font_size - 2)
-    plt.tight_layout()
-    plt.savefig(hist_plot_dir, dpi=300, bbox_inches='tight')
-    plt.savefig(hist_plot_dir[:-3] + "eps", format='eps', bbox_inches='tight')
-    
-    return None
-
-
-def simple_anomaly_detection(blob_loader, non_blob_test_loader, non_blob_train_loader, device,
-    mean_act=0, std_act=1, hist_plot_dir="images/SAD-hist.jpg"):
-    # SAD = Simple-Anomaly-Detection
-    # We compare the anomalous activity image with all the training set images and find its difference with the most similar one.
-    # The aim  is to see if it works as well as the back_and_forth method.
-    # non_blob_test_loader, is the same as non_blob_loader in back_and_forth
-    # BATCH SIZE NEEDS TO BE ONE, FOR NOW
-    
-    l2_loss = nn.MSELoss(reduction='none')
-    l2_loss_list = []
-    non_blob_l2_loss_list = []
-    l2_loss_list_std = []
-    non_blob_l2_loss_list_std = []
-
-    with torch.no_grad():
-        # for distorted imaegs
-        for act, _, _ in tqdm(blob_loader):
-            # Loading a few examples
-            act = act.detach().cpu()
-            torch.cuda.empty_cache()  # Freeing up RAM
-            act = mean_act + act * std_act  # undoing normalization
-            individual_l2_loss_list = []
-            individual_l2_loss_list_std = []
-            for non_blob_act, _, _ in non_blob_train_loader:
-                non_blob_act = non_blob_act.detach().cpu()
-                non_blob_act = mean_act + non_blob_act * std_act
-                individual_l2_loss_list.append(l2_loss(act, non_blob_act).mean().item())
-                individual_l2_loss_list_std.append(l2_loss(act, non_blob_act).std().item())
-            l2_loss_list.append(min(individual_l2_loss_list))
-            # position at which individual_l2_loss_list is minimum
-            min_idx = individual_l2_loss_list.index(min(individual_l2_loss_list))
-            l2_loss_list_std.append(individual_l2_loss_list_std[min_idx])
-        # For non-distorted images
-        for act, _, _ in tqdm(non_blob_test_loader):
-            # Loading a few examples
-            act = act.detach().cpu()
-            torch.cuda.empty_cache()  # Freeing up RAM
-            act = mean_act + act * std_act  # undoing normalization
-            individual_l2_loss_list = []
-            individual_l2_loss_list_std = []
-            for non_blob_act, _, _ in non_blob_train_loader:
-                non_blob_act = non_blob_act.detach().cpu()
-                non_blob_act = mean_act + non_blob_act * std_act
-                individual_l2_loss_list.append(l2_loss(act, non_blob_act).mean().item())
-                individual_l2_loss_list_std.append(l2_loss(act, non_blob_act).std().item())
-            non_blob_l2_loss_list.append(min(individual_l2_loss_list))
-            # position at which individual_l2_loss_list is minimum
-            min_idx = individual_l2_loss_list.index(min(individual_l2_loss_list))
-            non_blob_l2_loss_list_std.append(individual_l2_loss_list_std[min_idx])
-        
-    l2_loss_list = torch.tensor(l2_loss_list)
-    non_blob_l2_loss_list = torch.tensor(non_blob_l2_loss_list)
-    l2_loss_list_std = torch.tensor(l2_loss_list_std)
-    non_blob_l2_loss_list_std = torch.tensor(non_blob_l2_loss_list_std)
-    text_results = f"L2 Loss (with distortion): {torch.mean(l2_loss_list)} +- {torch.mean(l2_loss_list_std)}\n" \
-        f"L2 Loss (without distortion): {torch.mean(non_blob_l2_loss_list)} +- {torch.mean(non_blob_l2_loss_list_std)}" 
-    print(text_results)
-    
-    font_size = 26
-    bin_width = 0.00002  # bin_width = 0.00005
-    # Histogram comparison
-    plt.rcParams['font.family'] = 'serif'
-    plt.rcParams['font.serif'] = 'Times New Roman'
-    plt.figure(figsize=(10, 6))
-    plt.xticks(fontsize=font_size, rotation=45)
-    plt.yticks(fontsize=font_size)
-    sns.histplot(l2_loss_list.cpu().numpy().flatten(), color="red", alpha=0.75, label="Distorted", binwidth=bin_width)
-    sns.histplot(non_blob_l2_loss_list.cpu().numpy().flatten(), color="skyblue", alpha=0.75, label="Non-Distorted", binwidth=bin_width)
-    plt.title("Histogram of Mean Image MSE(Original, Most Similar In Train Set)", fontsize=font_size)
-    plt.xlabel("Activity (units)", fontsize=font_size)
-    plt.ylabel("Frequency", fontsize=font_size)
-    plt.legend(fontsize=font_size - 2)
-    plt.tight_layout()
-    plt.savefig(hist_plot_dir, dpi=300, bbox_inches='tight')    
-    plt.savefig(hist_plot_dir[:-3] + "eps", format='eps', bbox_inches='tight')
-    
-    return None
-                
-                
-    
     
 
 def sobp_comparison(trained_model, loaders, device, CT_manual=None, output_transform=None,
@@ -1929,7 +1443,7 @@ def sobp_comparison(trained_model, loaders, device, CT_manual=None, output_trans
             if isinstance(loaders, DataLoader):
                 loaders =  [loaders]    # Put into a list to be able to handle arbitraril many datasets corresponding to the same beams so that we can average them correspondingly
             for loader in loaders: 
-                for batch_input, batch_target, beam_numbers, mean_output, std_output in tqdm(loader):  ###
+                for batch_input, batch_target, beam_numbers, mean_output, std_output in tqdm(loader):  
                     batch_target = batch_target.to(device)
                     batch_input = batch_input.to(device)
                     batch_output = trained_model(batch_input)
@@ -1997,7 +1511,7 @@ def sobp_comparison(trained_model, loaders, device, CT_manual=None, output_trans
     z_slice_idx = idcs_max_target[-1].item()  # Plotting the slice where the value of the dose is maximum
     y_slice_idx = idcs_max_target[-2].item()  # For later plotting the profile
                 
-    ###
+    
     input_img = input_img[:,:,z_slice_idx]
     out_img = out_img[:,:,z_slice_idx]
     target_img = target_img[:,:,z_slice_idx]
@@ -2008,13 +1522,13 @@ def sobp_comparison(trained_model, loaders, device, CT_manual=None, output_trans
     
     max_target = torch.max(target_img) 
     max_input = max_target 
-    ###
+    
     
     if CT_manual is not None:  # Alternatively, the user can manually pass the CT as input 
         CT_flag = True
         vmin_CT = -125
         vmax_CT = 225
-        # mask = np.where(target_img > 0.1 * torch.max(target_img), 0.8, 0.0)  # Masking 0 values to be able to see the CT ###
+        # mask = np.where(target_img > 0.1 * torch.max(target_img), 0.8, 0.0)  # Masking 0 values to be able to see the CT 
         mask_input = ((input_img - torch.min(input_img)) / (torch.max(input_img) - torch.min(input_img))).numpy() * 1.4
         mask_target = ((target_img - torch.min(target_img)) / (torch.max(target_img) - torch.min(target_img))).numpy() * 1.4
         mask_input[mask_input > 1.0] = 1.0
@@ -2097,42 +1611,6 @@ def sobp_comparison(trained_model, loaders, device, CT_manual=None, output_trans
     return None
             
     
-
-# def find_max_closest_to_edge(loader):
-#     closest_edge_distance = float('inf')
-#     closest_max_index = None
-#     closest_tensor = None
-    
-#     for _, batch in loader:
-#         # Find the maximum value in each 3D image of the batch
-#         max_vals, _ = torch.max(batch.view(batch.size(0), -1), dim=1)
-        
-#         # Iterate through the batch to find the index of the overall maximum in the last dimension
-#         for i, max_val in enumerate(max_vals):
-#             # Get the positions of the overall maximum values
-#             pos = (batch[i] == max_val).nonzero(as_tuple=True)
-#             # Consider the last dimension (W)
-#             max_index_last_dim = pos[-1]
-#             # Calculate the distance to the closest edge in the last dimension
-#             edge_distance = torch.min(max_index_last_dim, batch.shape[-1] - 1 - max_index_last_dim)
-#             edge_distance = max_index_last_dim
-#             if edge_distance < closest_edge_distance:
-#                 closest_edge_distance = edge_distance
-#                 closest_max_index = max_index_last_dim
-#                 closest_tensor = batch[i]
-
-    # # Now plot the 2D slice
-    # sample_2d_slice = closest_tensor[:,32,:].cpu().detach().numpy()
-    # plt.imshow(sample_2d_slice, cmap='gray')
-    # plt.colorbar()
-    # plt.title(f'2D slice of the sample with max value closest to the edge')
-    # plt.show()
-
-    # plt.savefig("images/test_closest_edge")
-
-#     return closest_max_index.item(), closest_tensor
-
-
 # Plotting a single test reconstructed beam
 def plot_test_beam(trained_model, input, target, device, CT_flag=False, CT_manual=None, mean_input=0, std_input=1,
                    mean_output=0, std_output=1, z_slice = None,
@@ -2179,7 +1657,7 @@ def plot_test_beam(trained_model, input, target, device, CT_flag=False, CT_manua
         target_img = target_img[:,:,z_slice_idx]
         
         if CT_flag:
-            # mask = np.where(target_img > 0.1 * torch.max(target_img), 0.8, 0.0)  # Masking 0 values to be able to see the CT ###
+            # mask = np.where(target_img > 0.1 * torch.max(target_img), 0.8, 0.0)  # Masking 0 values to be able to see the CT 
             mask_input = ((input_img - torch.min(input_img)) / (torch.max(input_img) - torch.min(input_img))).numpy() * 1.4
             mask_target = ((target_img - torch.min(target_img)) / (torch.max(target_img) - torch.min(target_img))).numpy() * 1.4
             mask_input[mask_input > 1.0] = 1.0
@@ -2279,12 +1757,9 @@ def plot_losses(training_losses, val_losses, save_plot_dir="images/loss.jpg"):
     plt.savefig(save_plot_dir[:-3] + "eps", format='eps', bbox_inches='tight')
     return None
 
-import csv
-import torch
-import torch.nn as nn
-import os
-from utils import pymed_gamma, psnr
+
 def input_vs_reference(input_dir, reference_dir, pymed_gamma=False, mm_per_voxel=(1.9531, 1.9531, 1.9531), num_samples=5, comparison_dir="data/comparison.csv"):
+    
     file_exists = os.path.isfile(comparison_dir)
     l2_loss_list = []
     l2_loss = nn.MSELoss()
@@ -2332,6 +1807,7 @@ def input_vs_reference(input_dir, reference_dir, pymed_gamma=False, mm_per_voxel
         writer.writerow(data)
     return None
 
+
 def gaussian_input_vs_reference(input_dir, reference_dir, pymed_gamma=False, num_samples=5, comparison_dir="data/comparison.csv"):
     file_exists = os.path.isfile(comparison_dir)
     
@@ -2352,7 +1828,7 @@ def gaussian_input_vs_reference(input_dir, reference_dir, pymed_gamma=False, num
         for sample in os.listdir(input_dir)[:num_samples]:
             reference_sample = torch.tensor(np.load(os.path.join(reference_dir, sample)), dtype=torch.float32).unsqueeze(0).unsqueeze(0)
 
-            ### If we were corrupting with gaussian noise
+            # If we were corrupting with gaussian noise
             reference_sample = (reference_sample - torch.mean(reference_sample)) / torch.std(reference_sample)
             # Generate Gaussian noise
             noise = torch.randn_like(reference_sample) * torch.sqrt(torch.tensor(t))
@@ -2393,8 +1869,6 @@ def gaussian_input_vs_reference(input_dir, reference_dir, pymed_gamma=False, num
     return None
 
 
-
-
 from ptflops import get_model_complexity_info
 def save_model_complexity(model, img_size, model_name="undefined", model_sizes_txt="models/model_sizes.txt"):
     flops, params = get_model_complexity_info(model, img_size, as_strings=False, print_per_layer_stat=False)
@@ -2404,7 +1878,6 @@ def save_model_complexity(model, img_size, model_name="undefined", model_sizes_t
             file.write(complexity_info)
     return None
     # Need to set return_bottleneck=True in SwinUNETR with DPB so that it computes the complexity appropriately
-
 
 
 def get_kernels_strides(img_size, mm_per_voxel):
@@ -2507,476 +1980,6 @@ def compare_plan_pet(
     fig.subplots_adjust(left=0.1, right=0.9, top=0.9, bottom=0.1)
     fig.savefig(save_plot_dir, dpi=600, bbox_inches='tight')
     fig.savefig(save_plot_dir[:-3] + "eps", format='eps', bbox_inches='tight')
-
-
-# ### Function to plot loss if it was not saved correctly using livelossplot
-# import matplotlib.pyplot as plt
-# import pandas as pd
-# loss = pd.read_csv("models/Prostatax10/losses/SwinUNETR-v1-loss.csv")
-# plt.figure()
-# plt.plot(loss["Epoch"], loss["Training Loss"], label="train")
-# plt.plot(loss["Epoch"], loss["Validation Loss"], label="val")
-# plt.legend()
-# plt.savefig("images/Prostatax10/SwinUNETR-v1-loss.jpg")
-# stop
-# ###
-
-
-# Reconstructing a dose further on from the rest of the beams
-# from utils import plot_test_beam
-# save_plot_dir = "images/test_reconstructed_beam.jpg"
-# input = np.load("data/dataset_1/Acti1.npy")
-# target = np.load("data/dataset_1/Dose10.npy")
-# input = torch.tensor(input).unsqueeze(0)
-# target = torch.tensor(target).unsqueeze(0)
-# input, target = joint_transform(input, target)
-# input = input.unsqueeze(0)
-# target = target.unsqueeze(0)
-# print(input.shape)
-# print(target.shape)
-# input = (input - mean_input) / std_input
-# target = (target - torch.mean(target)) / torch.std(target)
-# print(torch.mean(input), torch.std(input), mean_input, std_input)
-# plot_test_beam(trained_model, input, target, device, mean_output=mean_output, CT_manual=CT, mean_input=mean_input, std_input=std_input, 
-#          std_output=std_output, save_plot_dir=save_plot_dir, patches=patches, patch_size=img_size[2]//2)
-
-
-# #Anomaly detection
-# input_transform = Compose([
-#     GaussianBlob(30, 5),
-#     Normalize(mean_input, std_input)
-# ])
-# num_samples_blob = 30
-# blob_dataset = DoseActivityDataset(input_dir=input_dir, output_dir=output_dir,
-#                               input_transform=input_transform, output_transform=output_transform, joint_transform=joint_transform,
-#                               num_samples=num_samples_blob, CT=CT)
-# plot_loader = DataLoader(blob_dataset, batch_size=batch_size, shuffle=True, num_workers=1)
-# test_loader = plot_loader
-# dose2act_model_dir = "models/trained-models/reverse-SwinUNETR-v1.pth"
-# dose2act_model = torch.load(dose2act_model_dir, map_location=torch.device(device))
-# act2dose_model_dir = "models/trained-models/SwinUNETR-v1.pth"
-# act2dose_model = torch.load(act2dose_model_dir, map_location=torch.device(device))
-# back_and_forth(dose2act_model, act2dose_model, plot_loader, device, reconstruct_dose=False, num_cycles=1, y_slice=32, 
-#                mean_act=mean_input, std_act=std_input, mean_dose=mean_output, std_dose=std_output, save_plot_dir="images/reconstructed_act_blob_1cycle.jpg")
-
-
-### Finding the loss between low and high statistics beams
-# import torch
-# import torch.nn as nn
-# import os
-# from utils import RE_loss, range_loss, post_BP_loss, gamma_index, pymed_gamma, plot_range_histogram
-# import numpy as np
-# RE_loss_list = []
-# l2_loss_list = []
-# l2_loss = nn.MSELoss()
-# gamma_list = []
-# gamma_pymed_list = []
-
-# for filename in os.listdir("data/TestProstata2"):
-#     low_count = np.load("data/Prostata2Activation1k/" + filename)
-#     high_count = np.load("data/Prostata2Activation100k/" + filename)
-#     low_count = torch.tensor(low_count, dtype=torch.float32).unsqueeze(0)
-#     high_count = torch.tensor(high_count, dtype=torch.float32).unsqueeze(0)
-#     low_count = input_transform(low_count)
-#     high_count = output_transform(high_count)
-#     high_count, low_count = joint_transform(high_count, low_count)
-#     high_count = high_count.unsqueeze(0)
-#     low_count = low_count.unsqueeze(0)
-#     low_count = low_count.to(device)
-#     high_count_predicted = trained_model(low_count)
-#     high_count_predicted = high_count_predicted.detach().cpu()
-#     low_count = low_count.detach().cpu()
-#     torch.cuda.empty_cache()
-
-#     threshold = 0.1  # Minimum relative dose considered for gamma index
-#     tolerance = 0.03  # Tolerance per unit for gamma index
-
-#     RE_loss_list.append(RE_loss(high_count, high_count_predicted, mean_output=mean_output, std_output=std_output))   ### set it to absolute value
-#     l2_loss_list.append(l2_loss(high_count, high_count_predicted))
-#     gamma_list.append(gamma_index(high_count, high_count_predicted, tolerance=tolerance, beta=5, mean_output=mean_output, std_output=std_output, threshold=threshold))
-#     gamma_pymed_list = pymed_gamma(gamma_pymed_list, high_count, high_count_predicted, dose_percent_threshold=tolerance*100, 
-#                                     distance_mm_threshold=1, threshold=threshold, mean_output=mean_output, std_output=std_output)
-
-
-# RE_loss_list = torch.cat(RE_loss_list)
-# l2_loss_list = torch.tensor(l2_loss_list)
-# gamma_list = torch.tensor(gamma_list)
-# gamma_pymed_list = torch.tensor(gamma_pymed_list)
-
-# text_results = f"Difference between simulated high counts and low counts: \n" \
-#         f"Relative Error: {torch.mean(torch.abs(RE_loss_list))} +- {torch.std(torch.abs(RE_loss_list))}\n" \
-#         f"L2 Loss: {torch.mean(l2_loss_list)} +- {torch.std(l2_loss_list)}\n" \
-#         f"Gamma index: {torch.mean(gamma_list)} +- {torch.std(gamma_list)}\n" \
-#         f"Gamma index (good one - pymed one): {torch.mean(gamma_pymed_list)} +- {torch.std(gamma_pymed_list)}\n\n" \
-        
-# print(text_results)
-
-# # Save to file
-# with open("difference_predicted_original_1k.txt", "w") as file:
-#     file.write(text_results)
-###
-
-###  Finding the loss between beams where only the random seed changed
-# import torch
-# import torch.nn as nn
-# import os
-# from utils import RE_loss, range_loss, post_BP_loss, gamma_index, pymed_gamma, plot_range_histogram
-# import numpy as np
-# RE_loss_list = []
-# l2_loss_list = []
-# l2_loss = nn.MSELoss()
-# gamma_list = []
-# gamma_pymed_list = []
-
-# for filename in os.listdir("data/TestProstata2"):
-#     seed2_activity = np.load("data/TestProstata2/" + filename)
-#     seed1_activity = np.load("data/Prostata2Activation100k/" + filename)
-#     seed2_activity = torch.tensor(seed2_activity, dtype=torch.float32).unsqueeze(0)
-#     seed1_activity = torch.tensor(seed1_activity, dtype=torch.float32).unsqueeze(0)
-#     seed2_activity = output_transform(seed2_activity)
-#     seed1_activity = output_transform(seed1_activity)
-#     seed1_activity, seed2_activity = joint_transform(seed1_activity, seed2_activity)
-#     seed1_activity = seed1_activity.unsqueeze(0)
-#     seed2_activity = seed2_activity.unsqueeze(0)
-    
-#     threshold = 0.1  # Minimum relative dose considered for gamma index
-#     tolerance = 0.03  # Tolerance per unit for gamma index
-    
-#     RE_loss_list.append(RE_loss(seed1_activity, seed2_activity, mean_output=mean_output, std_output=std_output))   ### set it to absolute value
-#     l2_loss_list.append(l2_loss(seed1_activity, seed2_activity))
-#     gamma_list.append(gamma_index(seed1_activity, seed2_activity, tolerance=tolerance, beta=5, mean_output=mean_output, std_output=std_output, threshold=threshold))
-#     gamma_pymed_list = pymed_gamma(gamma_pymed_list, seed1_activity, seed2_activity, dose_percent_threshold=tolerance*100, 
-#                                     distance_mm_threshold=1, threshold=threshold, mean_output=mean_output, std_output=std_output)
-
-    
-# RE_loss_list = torch.cat(RE_loss_list)
-# l2_loss_list = torch.tensor(l2_loss_list)
-# gamma_list = torch.tensor(gamma_list)
-# gamma_pymed_list = torch.tensor(gamma_pymed_list)
-
-# text_results = f"Difference between simulated high counts with different seeds: \n" \
-#         f"Relative Error: {torch.mean(torch.abs(RE_loss_list))} +- {torch.std(torch.abs(RE_loss_list))}\n" \
-#         f"L2 Loss: {torch.mean(l2_loss_list)} +- {torch.std(l2_loss_list)}\n" \
-#         f"Gamma index: {torch.mean(gamma_list)} +- {torch.std(gamma_list)}\n" \
-#         f"Gamma index (good one - pymed one): {torch.mean(gamma_pymed_list)} +- {torch.std(gamma_pymed_list)}\n\n" \
-           
-# print(text_results)
-
-# # Save to file
-# with open("seeds_difference_100k.txt", "w") as file:
-#     file.write(text_results)
-    
-
-# stop
-###
-
-# ###
-# import os
-# import matplotlib.pyplot as plt
-# def find_indices_1_percent_max(img_dir):
-#     results = {}
-#     highres_dir
-#     for file_path in os.listdir(img_dir):
-#         file_path = os.path.join(img_dir, file_path)
-#         # Load 3D image
-#         img = np.load(file_path)
-#         max_val = img.max()
-#         threshold = max_val * 0.9
-                
-#         # Mask for values above threshold
-#         mask = img >= threshold
-        
-#         # Find indices where mask is True
-#         indices = np.argwhere(mask)
-        
-#         # If no indices found, continue to next file
-#         if indices.size == 0:
-#             results[os.path.basename(file_path)] = {'x': (None, None), 'y': (None, None), 'z': (None, None)}
-#             continue
-        
-#         # Min and max indices for each dimension
-#         min_indices = indices.min(axis=0)
-#         max_indices = indices.max(axis=0)
-        
-#         results[os.path.basename(file_path)] = {
-#             'x': (min_indices[0], max_indices[0]),
-#             'y': (min_indices[1], max_indices[1]),
-#             'z': (min_indices[2], max_indices[2])
-#         }
-    
-#     return results
-
-# results = find_indices_1_percent_max(highres_dir)
-# print(results)
-# # Extract min and max indices from results
-# min_indices = {'x': [], 'y': [], 'z': []}
-# max_indices = {'x': [], 'y': [], 'z': []}
-
-# for _, indices in results.items():
-#     for dim in ['x', 'y', 'z']:
-#         min_indices[dim].append(indices[dim][0])
-#         max_indices[dim].append(indices[dim][1])
-
-# # Convert lists to numpy arrays for plotting
-# min_indices = {dim: np.array(vals) for dim, vals in min_indices.items()}
-# max_indices = {dim: np.array(vals) for dim, vals in max_indices.items()}
-
-# # Plot histograms
-# fig, axes = plt.subplots(1, 3, figsize=(18, 5), sharey=True)
-# for ax, dim in zip(axes, ['x', 'y', 'z']):
-#     ax.hist(min_indices[dim], bins=20, alpha=0.5, label=f'Min {dim.upper()}')
-#     ax.hist(max_indices[dim], bins=20, alpha=0.5, label=f'Max {dim.upper()}')
-#     ax.set_title(f'Distribution of {dim.upper()} indices')
-#     ax.set_xlabel('Index')
-#     ax.set_ylabel('Frequency')
-#     ax.legend()
-
-# plt.tight_layout()
-# plt.savefig('images/1-percent-max.jpg')
-# ###
-
-
-# How unfolding works in differntiable pymed
-# import torch.nn.functional as F
-# #make a 3d tensor with one channel and each pixel has its index as a value
-# output =  torch.arange(0, 45).reshape(5,3,3).unsqueeze(0).float()
-# print(output)
-# # Padding the tensor to get neighbours which have the same value as the edge value, not affecting the minimum calculation (torch.amin(diff, dim=0)) later on
-# output = F.pad(output.unsqueeze(1), (1, 1, 1, 1, 2, 2), mode='replicate').squeeze(1)
-# # Unfolding to extract the neighbours in each dimension
-# kernel_size = 3
-# print(output.shape)
-# output_unfolded = output.unfold(1, 5, 1).unfold(2, kernel_size, 1).unfold(3, kernel_size, 1)
-# print(output_unfolded.shape)
-# print(output_unfolded[0, 1, 1, 1, :, :, :])
-# output_unfolded = output_unfolded[:,:,:,:,:,kernel_size//2,kernel_size//2]### We are only interested in the neighbours in the lenghtwise direction (1mm resolution), not in the transversal plane (2mm resolution)
-
-# Plotting a sample beam
-# import matplotlib.pyplot as plt
-# beam = np.load("/scratch/petgfn/PabloJr/prototwin/activity-super-resolution/data/seed2-1k-Prostata3/5577.npy")
-
-# plt.figure()
-# plt.imshow(torch.sum(torch.tensor(beam), dim=2).T, cmap='jet')
-# plt.savefig("images/Prostata3x100/5577.jpg")
-# stop
-
-
-
-###
-# import torch
-# import torch.nn as nn
-# import os
-# from utils import RE_loss, range_loss, post_BP_loss, gamma_index, pymed_gamma, plot_range_histogram
-# import numpy as np
-# l2_loss_list = []
-# l2_loss = nn.MSELoss()
-# gamma_index_list = []
-# gamma_value_list = []
-
-# for filename in os.listdir("data/TestProstata2"):
-#     seed2_activity = np.load("data/Test2Prostata2/" + filename)
-#     seed1_activity = np.load("data/TestProstata2/" + filename)
-#     seed2_activity = torch.tensor(seed2_activity, dtype=torch.float32).unsqueeze(0)
-#     seed1_activity = torch.tensor(seed1_activity, dtype=torch.float32).unsqueeze(0)
-#     seed1_activity, seed2_activity = joint_transform(seed1_activity, seed2_activity)
-#     seed1_activity = seed1_activity.unsqueeze(0)
-#     seed2_activity = seed2_activity.unsqueeze(0)
-    
-#     threshold = 0.1  # Minimum relative dose considered for gamma index
-#     tolerance = 0.03  # Tolerance per unit for gamma index
-    
-#     l2_loss_list.append(l2_loss(seed1_activity, seed2_activity))
-#     gamma_index, gamma_value = pymed_gamma(seed1_activity, seed2_activity, dose_percent_threshold=tolerance*100, 
-#                                     distance_mm_threshold=1, threshold=threshold)
-#     gamma_index_list.append(gamma_index)
-#     gamma_value_list.append(gamma_value)
-    
-
-# l2_loss_list = torch.tensor(l2_loss_list)
-# gamma_index_list = torch.tensor(gamma_index_list)
-# gamma_value_list = torch.cat(gamma_value_list)
-
-
-# text_results = f"Difference between simulated high counts with different seeds: \n" \
-#         f"L2 Loss: {torch.mean(l2_loss_list)} +- {torch.std(l2_loss_list)}\n" \
-#         f"Gamma value: {torch.mean(gamma_value_list)} +- {torch.std(gamma_value_list)}\n" \
-#         f"Gamma index: {torch.mean(gamma_index_list)} +- {torch.std(gamma_index_list)}\n\n" \
-           
-# print(text_results)
-
-# # Save to file
-# with open("new_seeds_difference_3_100k.txt", "w") as file:
-#     file.write(text_results)
-
-# stop
-###
-
-
-# Super Resolution Dataset from 21/2/24 (just before presentation)
-# # Creating a dataset for the low statistics / high statistics or low statistics / low statistics pairs
-# class SuperResolutionDataset(Dataset):
-#     """
-#     Create the dataset where the low resolution activity is the input and the high or low resolution is the output.
-#     The relevant transforms are applied. To use Noise2Noise (lowres to lowres for training), provide a lowres_dir_2
-#     """
-#     def __init__(self, lowres_dir_1, highres_dir=None, lowres_dir_2=None, num_samples=5, lowres_transform=None, highres_transform=None, 
-#                  joint_transform=None, CT_flag=False, CT=None, energy_beam_dict=None,
-#                  training_set=False, test_set=False):
-#         self.input_dir = lowres_dir_1
-#         self.input_transform = lowres_transform
-#         if lowres_dir_2 is not None and highres_dir is None:
-#             self.output_dir = lowres_dir_2
-#             self.output_transform = lowres_transform
-#         else:
-#             self.output_dir = highres_dir
-#             self.output_transform = highres_transform
-#         self.joint_transform = joint_transform  # Transforms applied to both input and output images
-#         self.energy_beam_dict = energy_beam_dict  # Dictionary including the energy for each beam in keV
-#         self.file_names = os.listdir(self.input_dir)[:num_samples]  # Only selecting as many files as given by num_samples
-        
-#         # Making a testing set made up of the most energetic beams and a training set w/ the rest
-#         # (this means that our network has not been trained with beams as energetic as these, 
-#         # and thus they are "new" to it; this could not be done with the linear combination of beams)
-#         if (training_set or test_set) and energy_beam_dict:
-#             self.file_names_new = []
-#             energy_counts = Counter(energy_beam_dict.values())
-#             sorted_energies = sorted(energy_counts.keys())  # Sorts the energies of all beams in the dictionary
-#             energy_threshold = float(sorted_energies[-4])   # Selecting the train/test energy threshold to the fourth most powerful energies (there are around 50 different beam energies)
-#             number_beams = len(self.file_names)
-#             for idx in range(number_beams):    
-#                 beam = self.file_names[idx][:4]
-#                 beam_energy = energy_beam_dict[beam]
-#                 if test_set and float(beam_energy) >= energy_threshold:  # If generating the test set and if a beam has an energy above the threshold, select it
-#                     self.file_names_new.append(self.file_names[idx])
-#                 elif training_set and float(beam_energy) <= energy_threshold:   # If generating the training set and if a beam has an energy below the threshold, select it
-#                     self.file_names_new.append(self.file_names[idx])
-#             self.file_names = self.file_names_new
-          
-#         self.CT_flag = CT_flag  # Flag indicating whether the set will include the CT as a second channel to train the nets
-#         self.CT = CT
-
-#     def __len__(self):
-#         return len(self.file_names)
-
-#     def __getitem__(self, idx):
-#         # Load activity and dose images (numpy arrays)
-#         input_volume = np.load(os.path.join(self.input_dir, self.file_names[idx]))
-#         output_volume = np.load(os.path.join(self.output_dir, self.file_names[idx]))
-
-#         # Convert numpy arrays to PyTorch tensors
-#         input_volume = torch.tensor(input_volume, dtype=torch.float32).unsqueeze(0)
-#         output_volume = torch.tensor(output_volume, dtype=torch.float32).unsqueeze(0)
-
-#         # Apply transforms
-#         if self.joint_transform:
-#             input_volume, output_volume = self.joint_transform(input_volume, output_volume)
-#         if self.input_transform:
-#             input_volume = self.input_transform(input_volume)
-#         if self.output_transform:
-#             output_volume = self.output_transform(output_volume)
-#         if self.CT_flag:
-#             input_volume = torch.cat((input_volume, torch.tensor(self.CT, dtype=torch.float32).unsqueeze(0)))  # Placing the CT as a second input channel
-#         if self.energy_beam_dict is not None:
-#             beam_number = self.file_names[idx][:4]
-#             beam_energy = self.energy_beam_dict.get(beam_number, 0.0)  # If the energy is not in the dictionary, set to 0
-#             beam_energy = float(beam_energy) / 1000  # from keV to MeV
-#         else: 
-#             beam_energy = np.nan
-            
-#         return input_volume, output_volume, float(beam_number), 0, 1
-
-### Comparing all beams
-# z_center = 16
-
-# fig, axs = plt.subplots(2, 2, figsize=(10, 10))
-
-# # Plotting the central z slice of each image in 'jet' colormap
-# axs[0, 0].imshow(lowres_volumes_transformed[0][:, :, z_center].squeeze(0), cmap='jet')
-# axs[0, 0].set_title('Image 1')
-# axs[0, 1].imshow(lowres_volumes_transformed[1][:, :, z_center].squeeze(0), cmap='jet')
-# axs[0, 1].set_title('Image 2')
-# axs[1, 0].imshow(lowres_volumes_transformed[2][:, :, z_center].squeeze(0), cmap='jet')
-# axs[1, 0].set_title('Image 3')
-# axs[1, 1].imshow(highres_volume_transformed[:, :, z_center].squeeze(0), cmap='jet')
-# axs[1, 1].set_title('Image 4')
-# plt.tight_layout()
-
-# plt.savefig('/scratch/petgfn/PabloJr/prototwin/activity-super-resolution/data/test_dataset.jpg')
-###   
-
-### Comparing different randomly displaced densities and ionization potentials for SOBPs
-# import torch
-# import torch.nn as nn
-# import os
-# from utils import RE_loss, range_loss, post_BP_loss, gamma_index, pymed_gamma, plot_range_histogram
-# import numpy as np
-# l2_loss_list = []
-# l2_loss = nn.MSELoss()
-# gamma_index_list = []
-# gamma_value_list = []
-
-# sobp_list = []
-
-# dataset_folder = "/scratch/petgfn/PabloJr/prototwin/deep-learning-dose-activity-dictionary/data/sobp-dataset1/input"
-# folders = [f for f in os.listdir(dataset_folder) if os.path.isfile(os.path.join(dataset_folder, f))]
-# N_sobps = len(folders)
-# print(N_sobps)
-
-# for i in range(10):
-#     print(i)
-#     sobp_0 = np.load(os.path.join(dataset_folder, f"sobp{i}.npy"))
-#     sobp_1 = np.load(os.path.join(dataset_folder, f"sobp{i+1}.npy"))
-#     sobp_0 = torch.tensor(sobp_0, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
-#     sobp_1 = torch.tensor(sobp_1, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
-
-#     threshold = 0.1  # Minimum relative dose considered for gamma index
-#     tolerance = 0.03  # Tolerance per unit for gamma index
-
-#     l2_loss_list.append(l2_loss(sobp_0, sobp_1))
-#     gamma_index, gamma_value = pymed_gamma(sobp_0, sobp_1, dose_percent_threshold=tolerance*100, 
-#                                     distance_mm_threshold=1, threshold=threshold)
-#     gamma_index_list.append(gamma_index)
-#     gamma_value_list.append(gamma_value)
-
-
-# l2_loss_list = torch.tensor(l2_loss_list)
-# gamma_index_list = torch.tensor(gamma_index_list)
-# gamma_value_list = torch.cat(gamma_value_list)
-
-
-# text_results = f"Difference between simulated high counts with different seeds: \n" \
-#         f"L2 Loss: {torch.mean(l2_loss_list)} +- {torch.std(l2_loss_list)}\n" \
-#         f"Gamma value: {torch.mean(gamma_value_list)} +- {torch.std(gamma_value_list)}\n" \
-#         f"Gamma index: {torch.mean(gamma_index_list)} +- {torch.std(gamma_index_list)}\n\n" \
-           
-# print(text_results)
-
-# # # Save to file
-# # with open("new_seeds_difference_3_100k.txt", "w") as file:
-# #     file.write(text_results)
-
-# stop
-###
-
-
-
-# # For dose-activity pairs: Code to get dataset statistics and save dictionary to json
-# from utils import dataset_statistics
-# mean_input, std_input = dataset_statistics(input_dir, scaling, num_samples=num_samples)
-# mean_output, std_output = dataset_statistics(output_dir, scaling, num_samples=num_samples)
-# dataset_statistics_dict = {input_dir: {'mean_input': mean_input.item(), 'std_input': std_input.item()}, output_dir: {'mean_output': mean_output.item(), 'std_output': std_output.item()}}
-# with open(os.path.join(dataset_dir, 'dataset_statistics.json'), 'w') as f:
-#     json.dump(dataset_statistics_dict, f)
-
-# # For super-resolution / denoising: Code to get dataset statistics and save dictionary to json
-# from utils import dataset_statistics
-# dataset_statistics_dict ={}
-# for lowres_dir in lowres_dirs:
-#     mean_lowres, std_lowres = dataset_statistics(lowres_dir, scaling, num_samples=num_samples)
-#     dataset_statistics_dict[lowres_dir] = {'mean': mean_lowres.item(), 'std': std_lowres.item()}
-# with open('/scratch/petgfn/PabloJr/prototwin/progressive-denoising/data/dataset1/dataset_statistics.json', 'w') as f:
-#     json.dump(dataset_statistics_dict, f)
-
 
 
 ### Comparing different randomly displaced densities and ionization potentials for SOBPs. Place this code before creating the dataset in mains.py
@@ -3141,7 +2144,7 @@ def compare_plan_pet(
 #                 f"Pymed gamma index (3mm, 3%): {torch.mean(gamma_pymed_list_3_torch)} +- {torch.std(gamma_pymed_list_3_torch)}\n" \
 #                 f"Fraction of gamma values below 0.9: {fraction_below_90}\n\n"
 #         # Save to file
-#         with open(os.path.join(dataset_dir, "head_deviations_dose_differences_2e6.txt"), "w") as file: ###
+#         with open(os.path.join(dataset_dir, "head_deviations_dose_differences_2e6.txt"), "w") as file:
 #             file.write(text_results)
 # stop
 # ###

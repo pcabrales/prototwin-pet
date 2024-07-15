@@ -5,7 +5,6 @@ import numpy as np
 import itk
 import gzip
 from scipy.ndimage import zoom
-from scipy.io import loadmat
 
 def generate_sensitivity(
     img_shape, 
@@ -144,7 +143,7 @@ def crop_save_npy(npy_array, npy_path, raw_path=None, Trans=(0, 0, 0), HL=(64, 4
     return npy_array
     
 
-def crop_save_head_image(file_path, uncropped_shape=(272, 272, 176), 
+def crop_save_image(file_path, uncropped_shape=(272, 272, 176), 
                          xmin=0, xmax=None, ymin=0, ymax=None, zmin=0, zmax=None,
                          is_CT_image=False, crop_body=False, body_coords=None, save_raw=False):
     with open(file_path, 'rb') as f:  
@@ -181,43 +180,6 @@ def crop_save_head_image(file_path, uncropped_shape=(272, 272, 176),
     return img
 
 
-def crop_prostate_image(file_path, img_voxels=(160, 32, 32)):
-    n_voxels = (512, 512, 90)
-    with open(file_path, 'rb') as f:
-        f.seek(274)  # header info, ADJUST SIZE TO HEADER SIZE
-        img = np.frombuffer(f.read(), dtype=np.float32).reshape(n_voxels, order='F')
-
-    voxel_size = [550/512, 550/512, 270/90]
-    # img_voxels is number of voxels in cropped image, [160, 64, 64] in mm (1x2x2mm resolution)
-    # Displacement of the center for each dimension (Notation consistent with TOPAS)
-    # Trans = [10, 0, 15]
-    Trans = [-10, -20, 0]  ### doesn't really affect if it is already simulated
-    TransX = int(Trans[0] // voxel_size[0])
-    TransY= int(Trans[1] // voxel_size[1])
-    TransZ = int(Trans[2] // voxel_size[2])
-
-    # Number of voxels of original image that we crop per side with respect to the center
-    HLX = int(img_voxels[0] // 2 // voxel_size[0] + 1)  # adding one to not overcrop the region
-    HLY = int(img_voxels[1] // voxel_size[1] + 1)
-    HLZ = int(img_voxels[2] // voxel_size[2] + 1)
-
-    # Distance covered by the cropped image (should be img_size but it is a bit more due to the cropping)
-    # just including it to be able to see it in the future
-    # cropped_X_size = HLX * 2 * voxel_size[0]
-    # cropped_Y_size = HLY * 2 * voxel_size[1]
-    # cropped_Z_size = HLZ * 2 * voxel_size[2]
-    img = img[img.shape[0]//2 + TransX - HLX : img.shape[0]//2 + TransX + HLX,
-                img.shape[1]//2 + TransY - HLY : img.shape[1]//2 + TransY + HLY,
-                img.shape[2]//2 + TransZ - HLZ : img.shape[2]//2 + TransZ + HLZ]
-
-    img = zoom(img, (img_voxels[0] / img.shape[0], img_voxels[1] / img.shape[1], img_voxels[2] / img.shape[2]))
-    
-    img = img.transpose(2, 1, 0)
-    os.remove(file_path)
-    img.tofile(file_path[:-3] + "raw")
-
-    return None
-
 def get_isotope_factors(initial_time, final_time, irradiation_time=0, isotope_list=['C11', 'N13', 'O15']):
     # Initial and final time of PET measurements in ***minutes****
     # Half lives
@@ -242,32 +204,16 @@ def get_isotope_factors(initial_time, final_time, irradiation_time=0, isotope_li
     # Biological decay constants
     # Medium and fast components are based on Toramatsu et al. 2018, slow based on Parodi et al. 2007
     lambda_bio_dict = {}
-    # lambda_bio_dict['C11'] = {'air': {'fast':21.04, 'medium':0.3, 'slow':0.},
-    #                             'fat': {'fast':21.04, 'medium':0.3, 'slow':np.log(2) * 60 /15000},
-    #                             'brain': {'fast':21.04, 'medium':0.3, 'slow':np.log(2) * 60 /10000},
-    #                             'soft bone': {'fast':21.04, 'medium':0.3, 'slow':np.log(2) * 60 /8000},
-    #                             'compact bone': {'fast':21.04, 'medium':0.3, 'slow':np.log(2) * 60 /15000}}    
-    # lambda_bio_dict['O15'] = {'air': {'fast':0., 'medium':0.72, 'slow':0.024},
-    #                             'fat': {'fast':0., 'medium':0.72, 'slow':0.024},
-    #                             'brain': {'fast':0., 'medium':0.72, 'slow':0.024},
-    #                             'soft bone': {'fast':0., 'medium':0.72, 'slow':0.024},
-    #                             'compact bone': {'fast':0., 'medium':0.72, 'slow':0.024}}
-    
-    ### To remove biological washout uncomment this section and comment the lambda_bio_dict['C11'] and lambda_bio_dict['O15'] above as well as the component_fraction_dict['C11'] and component_fraction_dict['O15'] below
-    lambda_bio_dict['C11'] = {'air': {'fast':0., 'medium':0., 'slow':np.log(2) * 60 /10000},  ### remove these values for the slow component, testing for the washout curve
-                              'fat': {'fast':0., 'medium':0., 'slow':np.log(2) * 60 /10000},
-                                'brain': {'fast':0., 'medium':0., 'slow':np.log(2) * 60 /10000},
-                                'soft bone': {'fast':0., 'medium':0., 'slow':np.log(2) * 60 /10000},
-                                'compact bone': {'fast':0., 'medium':0., 'slow':np.log(2) * 60 /10000}}
-    lambda_bio_dict['O15'] = lambda_bio_dict['C11']
-    component_fraction_dict = {}  # fraction of slow, medium and fast components in each organ
-    component_fraction_dict['C11'] = {'air': {'fast':0., 'medium':0., 'slow':1.},
-                                        'fat': {'fast':0., 'medium':0., 'slow':1.},
-                                        'brain': {'fast':0., 'medium':0., 'slow':1.},
-                                        'soft bone': {'fast':0., 'medium':0., 'slow':1.},
-                                        'compact bone': {'fast':0., 'medium':0., 'slow':1}}
-    component_fraction_dict['O15'] = component_fraction_dict['C11']
-    ###
+    lambda_bio_dict['C11'] = {'air': {'fast':21.04, 'medium':0.3, 'slow':0.},
+                                'fat': {'fast':21.04, 'medium':0.3, 'slow':np.log(2) * 60 /15000},
+                                'brain': {'fast':21.04, 'medium':0.3, 'slow':np.log(2) * 60 /10000},
+                                'soft bone': {'fast':21.04, 'medium':0.3, 'slow':np.log(2) * 60 /8000},
+                                'compact bone': {'fast':21.04, 'medium':0.3, 'slow':np.log(2) * 60 /15000}}    
+    lambda_bio_dict['O15'] = {'air': {'fast':0., 'medium':0.72, 'slow':0.024},
+                                'fat': {'fast':0., 'medium':0.72, 'slow':0.024},
+                                'brain': {'fast':0., 'medium':0.72, 'slow':0.024},
+                                'soft bone': {'fast':0., 'medium':0.72, 'slow':0.024},
+                                'compact bone': {'fast':0., 'medium':0.72, 'slow':0.024}}
     
     lambda_bio_dict['C10'] = lambda_bio_dict['C11']
     lambda_bio_dict['O14'] = lambda_bio_dict['O15']
@@ -275,17 +221,17 @@ def get_isotope_factors(initial_time, final_time, irradiation_time=0, isotope_li
     lambda_bio_dict['P30'] = lambda_bio_dict['O15']
     lambda_bio_dict['K38'] = lambda_bio_dict['O15']  # For now setting K38 to O15 values
     
-    # component_fraction_dict = {}  # fraction of slow, medium and fast components in each organ
-    # component_fraction_dict['C11'] = {'air': {'fast':0., 'medium':0., 'slow':1.},
-    #                                     'fat': {'fast':0.2 * (1 - 0.9) / 0.52, 'medium':0.32 * (1 - 0.9) / 0.52, 'slow':.9},  # * 0.1 / 0.52 is the fraction of medium and fast components taking into account the slow component, which takes precedence
-    #                                     'brain': {'fast':0.2 * (1 - 0.35) / 0.52, 'medium':0.32 * (1 - 0.35) / 0.52, 'slow':.35},
-    #                                     'soft bone': {'fast':0.2 * (1 - 0.6) / 0.52, 'medium':0.32 * (1 - 0.6) / 0.52, 'slow':.6},
-    #                                     'compact bone': {'fast':0.2 * (1 - 0.9) / 0.52, 'medium':0.32 * (1 - 0.9) / 0.52, 'slow':.9}}
-    # component_fraction_dict['O15'] = {'air': {'fast':0., 'medium':.62, 'slow':.38},
-    #                                     'fat': {'fast':0., 'medium':.62, 'slow':.38},
-    #                                     'brain': {'fast':0., 'medium':.62, 'slow':.38},
-    #                                     'soft bone': {'fast':0., 'medium':.62, 'slow':.38},
-    #                                     'compact bone': {'fast':0., 'medium':.62, 'slow':.38}}
+    component_fraction_dict = {}  # fraction of slow, medium and fast components in each organ
+    component_fraction_dict['C11'] = {'air': {'fast':0., 'medium':0., 'slow':1.},
+                                        'fat': {'fast':0.2 * (1 - 0.9) / 0.52, 'medium':0.32 * (1 - 0.9) / 0.52, 'slow':.9},  # * 0.1 / 0.52 is the fraction of medium and fast components taking into account the slow component, which takes precedence
+                                        'brain': {'fast':0.2 * (1 - 0.35) / 0.52, 'medium':0.32 * (1 - 0.35) / 0.52, 'slow':.35},
+                                        'soft bone': {'fast':0.2 * (1 - 0.6) / 0.52, 'medium':0.32 * (1 - 0.6) / 0.52, 'slow':.6},
+                                        'compact bone': {'fast':0.2 * (1 - 0.9) / 0.52, 'medium':0.32 * (1 - 0.9) / 0.52, 'slow':.9}}
+    component_fraction_dict['O15'] = {'air': {'fast':0., 'medium':.62, 'slow':.38},
+                                        'fat': {'fast':0., 'medium':.62, 'slow':.38},
+                                        'brain': {'fast':0., 'medium':.62, 'slow':.38},
+                                        'soft bone': {'fast':0., 'medium':.62, 'slow':.38},
+                                        'compact bone': {'fast':0., 'medium':.62, 'slow':.38}}
     component_fraction_dict['C10'] = component_fraction_dict['C11']
     component_fraction_dict['O14'] = component_fraction_dict['O15']
     component_fraction_dict['N13'] = component_fraction_dict['O15']
@@ -402,17 +348,25 @@ def convert_CT_to_mhd(mhd_file, dicom_dir=None, matRad_output=None, image_size=(
 
 
 
-    ### To test the different between the original plan on different random seeds for different number of primaries
-    # # (Considering statistical fluctuations in the planned dose without deviations)
-    # seed_number = 42 * sobp_num
-    # random.seed(seed_number)
-    # np.random.seed(seed_number)
-    # with open(fredinp_destination, 'r', encoding='utf-8') as file:
-    #     lines = file.readlines()
-    # for line in range(len(lines)):
-    #     if lines[line].strip().startswith('randSeedRoot ='):
-    #         lines[line] = f'randSeedRoot = {seed_number}\n'
-    #         break
-    # with open(fredinp_destination, 'w', encoding='utf-8') as file:
-    #     file.writelines(lines)
-    ###
+### To test the different between the original plan on different random seeds for different number of primaries
+# # (Considering statistical fluctuations in the planned dose without deviations)
+# seed_number = 42 * sobp_num
+# random.seed(seed_number)
+# np.random.seed(seed_number)
+# with open(fredinp_destination, 'r', encoding='utf-8') as file:
+#     lines = file.readlines()
+# for line in range(len(lines)):
+#     if lines[line].strip().startswith('randSeedRoot ='):
+#         lines[line] = f'randSeedRoot = {seed_number}\n'
+#         break
+# with open(fredinp_destination, 'w', encoding='utf-8') as file:
+#     file.writelines(lines)
+###
+    
+# # Snippet to delete all HU lines:
+# n = 2379
+# with open(fred_input, 'r+') as file:
+#     lines = file.readlines()
+#     file.seek(0)
+#     file.truncate()
+#     file.writelines(lines[:-n])
