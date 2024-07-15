@@ -1,7 +1,7 @@
 data/*
-!data/HN-CHUM-018/
-data/HN-CHUM-018/*
-!data/HN-CHUM-018/matRad-output.mat
+!data/head-cort/
+data/head-cort/*
+!data/head-cort/sensitivity.npy
 models/trained-models
 generate-dataset/pet-simulation-reconstruction/mcgpu-pet/*
 !generate-dataset/pet-simulation-reconstruction/mcgpu-pet/MCGPU-PET-vision.in
