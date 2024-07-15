@@ -99,7 +99,7 @@ Specify the dataset folder, which was saved in Step 5 in `data` (not included in
 - Histograms of the errors in the predicted patient deviations
 - Training and validation losses vs number of epochs
   
-## Models 🤖
+## Models 🧠
 - nnFormer: Implementation of the nnFormer model adapted from the [official GitHub page](https://github.com/282857341/nnFormer) and the [3D UX-Net implementation](https://github.com/MASILab/3DUX-Net.git). For more details on the architecture, refer to the [paper](https://arxiv.org/abs/2109.03201).
     - It includes the code for the Deviation-Precting Branch (DPB), which outputs the displacement and rotation values of the patient that lead to dose deviations.
 - model_sizes.txt: File containing the sizes of the models in terms of parameters and FLOPs.
@@ -135,6 +135,8 @@ Specify the dataset folder, which was saved in Step 5 in `data` (not included in
 - config-main: Contains`.py` config files with the initialization parameters for each patient's deep learning model training and testing.
 
 ---
+
 ### Note: 
 All files too heavy to include here are located on the Octopus PC (147.96.73.91) and backups are saved in `/scratch/petgfn/PabloJr` on the `fistensor.fis.ucm.es` server.
+
 ---
