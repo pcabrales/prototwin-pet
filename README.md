@@ -16,8 +16,6 @@ The workflow starts with the treatment plan obtained from the patient’s CT sca
 
 The resulting dataset of PET-dose pairs is used to train a state-of-the-art, efficient 3D deep learning model with a Deviation Predicting Branch (DPB) to predict dose maps and patient set-up errors from PET scans within milliseconds after a proton therapy treatment.
 
-### Note: 
-All files too heavy to include here are located on the Octopus PC (147.96.73.91) and backups are saved in `/scratch/petgfn/PabloJr` on the `fistensor.fis.ucm.es` server.
 
 ## Set Up Environment 🧱
 
@@ -26,7 +24,7 @@ Begin by cloning the entire repository and navigating to the project directory:
 git clone https://github.com/pcabrales/prototwin-pet.git
 ```
 
-This is a Python-based project. Creating a conda environment is recommended to manage the dependencies. To make and activate conda enviroment with the necessary packages, run:
+This is a Python-based project. Creating a conda environment is recommended to manage the dependencies. To make and activate conda environment with the necessary packages, run:
 ```bash
 conda env create -f environment.yml
 conda activate prototwin-pet
@@ -43,7 +41,7 @@ You will also need:
 - Code for Positron Range Correction (Híbrido, Paula Ibañez, UCM - Not included in the repository, not open-source yet)
 - MCGPU-PET software:
     - Install from the [official GitHub page](https://github.com/DIDSR/MCGPU-PET.git)
-    - Compile to obtain the executable as instructed in the `README.md` and place in `/generate-dataset/pet-simulation-reconstruction/mcgpu-pet`
+    - As instructed in the `README.md` compile and place in `/generate-dataset/pet-simulation-reconstruction/mcgpu-pet/MCGPU-PET.x`
 
 #### Optional (to run helper and exploratory files, not included in the `.yml`):
     - pydicom
@@ -54,21 +52,20 @@ You will also need:
 
 ### Step 0: Select a Patient 🧑‍⚕️
 
-#### Option A (for testing purposes): Use the Head and Neck Data Provided by MatRad from the CORT Dataset
-- You only need to load `HEAD_AND_NECK.mat` in MatRad, which is included in the phantoms folder of the `matRad-master`.
+#### Option A (for testing purposes): Use the Head and Neck Data Provided by MatRad from the [CORT](https://academic.oup.com/gigascience/article/3/1/2047-217X-3-37/2682969) Dataset
+- You only need to load `HEAD_AND_NECK.mat` in MatRad, which is included in the `phantoms` folder of the `matRad-master`.
 
 #### Option B: Use External Data 
 The data should contain the CT and RTSTRUCTs with the OAR and target tumor volumes in DICOM format 
-In our submitted article, we selected patient HN-CHUM-018 from the [Head-Neck-PET-CT dataset](https://www.cancerimagingarchive.net/collection/head-neck-pet-ct/), which is available to the public but requires registration and approval.
+In our study, we selected patient HN-CHUM-018 from the [Head-Neck-PET-CT dataset](https://www.cancerimagingarchive.net/collection/head-neck-pet-ct/), which is available to the public but requires registration and approval.
 -  `INFOclinical_HN_Version2_30may2018.xlsx` file is used to select the patient.
 - `metadata.csv` to find the CT and RTSTRUCT files.
-- In a single folder, place the CT (`dcm` files for each axial slice) and RTSTRUCT (single `dcm` file) for MatRad processing. In this case: `/path/to/HeadPlans/HN-CHUM-018/data/matRad-HN-CHUM-018`. Also move the `CT` folder with the  `dcm` slices to `/path/to/HeadPlans/HN-CHUM-018/data/CT`.
+- In a single folder, place the CT (`dcm` files for each axial slice) and RTSTRUCT (single `dcm` file) for MatRad processing. In this case: `/path/to/HeadPlans/HN-CHUM-018/data/matRad-HN-CHUM-018`. Also, move the `CT` folder with the  `dcm` slices to `/path/to/HeadPlans/HN-CHUM-018/data/CT`.
 - Run `matRadGUI` in MATLAB and click "Load DICOM" in the Workflow box (top left). Select the directory with the click on the patient ID.
 - Save the .mat file by clicking "Import". Save it to `/path/to/matRad-master/phantoms/HN-CHUM-018.mat`.
 
 ### Step 1: MatRad for Treatment Planning 🎛️
-- After installing matRad, copy the provided `generate_dataset/matRad_head_protons.m` file to the matRad-master base directory and run it. This is basically the same example as provided in the `/matRad/examples/matRad_example5_protons.m` script, which you can find directly [here](https://github.com/e0404/matRad/blob/master/examples/matRad_example5_protons.m), but with the code to save the output parameters for the Monte Carlo simulation and the optimization angles for the article's HN-CHUM-018 patient.
-
+- After installing matRad, copy the provided `generate_dataset/matRad_head_protons.m` file to the `matRad-master` base directory and run it. This is basically the same example as provided in the `/matRad/examples/matRad_example5_protons.m` script, which you can find directly [here](https://github.com/e0404/matRad/blob/master/examples/matRad_example5_protons.m), but with the code to save the output parameters for the Monte Carlo simulation and the optimization angles for the article's HN-CHUM-018 patient.
 
 ### Step 2: Generate Dataset 🛠️
 Run the dataset generation script, changing the `USER-DEFINED PR0TOTWIN-PET PARAMETERS` inside the script as needed:
@@ -89,7 +86,7 @@ Specify the dataset folder, which was saved in Step 5 in `data` (not included in
 - Other results and images are saved in `images` and `models`.
 
 
-## Repositorty Table of Contents 📑
+## Repository Table of Contents 📑
 1. [Images](/images)
 2. [Models](/models)
 3. Testing, training, utility and main scripts
@@ -98,7 +95,7 @@ Specify the dataset folder, which was saved in Step 5 in `data` (not included in
 6. [Config files](/config-main)
 
 ## Images 🖼️
-- Sample slices comparing the treatment plan and the actual delivered, ground truth dosages, as well as the the estimated and the ground truth dosages for a given PET
+- Sample slices comparing the treatment plan and the actual delivered, ground truth dosages, as well as the estimated and the ground truth dosages for a given PET
 - Histograms of the errors in the predicted patient deviations
 - Training and validation losses vs number of epochs
   
@@ -112,7 +109,7 @@ Specify the dataset folder, which was saved in Step 5 in `data` (not included in
 - training-times: Folder containing txt files with the training duration.
 
 
-## Testing, training, utility and main scripts 🏋️‍♂️
+## Testing, training, utility, and main scripts 🏋️‍♂️
 - train_model.py: Script with the model training functions.
 - test_model.py: Script with the model testing functions to save the results
 - utils.py: Various utility functions and helpers for the deep learning training and testing, including custom transforms, dataset classes and plotting functions, among others.
@@ -137,5 +134,7 @@ Specify the dataset folder, which was saved in Step 5 in `data` (not included in
 ## Config Files 📝
 - config-main: Contains`.py` config files with the initialization parameters for each patient's deep learning model training and testing.
 
-
+---
+### Note: 
+All files too heavy to include here are located on the Octopus PC (147.96.73.91) and backups are saved in `/scratch/petgfn/PabloJr` on the `fistensor.fis.ucm.es` server.
 ---
