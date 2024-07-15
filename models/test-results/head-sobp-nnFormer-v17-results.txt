@@ -1,0 +1,14 @@
+L2 Loss (Gy²): 0.0001147977527580224 +- 2.738577859418001e-05
+Mean Relative Error (%): 0.5859234929084778 +- 0.05795563757419586
+Peak Signal-to-Noise Ratio: 47.509220123291016 +- 0.9050018191337585
+Pymed gamma value (1mm, 1%): 0.29189811209398936 +- 0.28428483633148927
+Pymed gamma index (1mm, 1%): 0.9677916666666665 +- 0.012190442324131266
+Pymed gamma value (3mm, 3%): 0.12058119682091116 +- 0.09030697645196185
+Pymed gamma index (3mm, 3%): 0.999875 +- 0.0003378319623460884
+Fraction of gamma values below 0.9: 0.0
+
+Time per loading (ms): 34.05784567197164 +- 1.18245813204649
+
+ x deviation error (mm), maximum deviation is +- 5mm: 0.0785907432436943 +- 0.12244568765163422
+y deviation error (mm), maximum deviation is +- 5mm: 0.04358169436454773 +- 0.0659327507019043
+Mean deviation error psi (degrees), maximum deviation is +- 5º: 0.08177722990512848 +- 0.10358739644289017

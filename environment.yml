@@ -1,0 +1,26 @@
+name: prototwin-pet
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11.9
+  - pip
+  - parallelproj=1.8.0
+  - libparallelproj=1.8.0
+  - cupy
+  - itk
+  - scipy
+  - matplotlib
+  - pandas
+  - tqdm
+  - seaborn
+  - ptflops
+  - einops
+  - timm
+  - pytest
+  - gzip
+  - pip:
+    - torch==2.2.1
+    - torchvision==0.17.1
+    - batchgenerators
+    - pymedphys==0.38
+

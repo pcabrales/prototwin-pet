@@ -1,0 +1,23 @@
+### Base Input File ###
+
+field< 
+    ID = Phantom
+    O=[0, 0, 0]
+    pivot=[0.5, 0.5, 0.5]
+    L=[48.3, 48.3, 33.5]
+    CTscan=/home/pablo/prototwin/deep-learning-dose-activity-dictionary/generate-dataset/../../../HeadPlans/head-cort/CT.mhd
+field>
+
+# Conversión de HU a material:
+lUseInternalHU2Mat=False
+lAllowHUClamping=True  # A partir de 1300 se corta (hay poco más allá del hueso)
+lWaterIpotForHUMaterials=False
+
+activation: isotopes = [C11, N13, O15, K38];
+
+# Set the seed:
+randSeedRoot = 42
+
+# Define region for scoring
+region: Phantom; score=[Dose, activation];
+varianceReduction: maxNumIterations=10; lStratifiedSampling=t

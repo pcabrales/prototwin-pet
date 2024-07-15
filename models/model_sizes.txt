@@ -1,0 +1,22 @@
+sobp-swinunetr-v12: 3.12e+01 GFLOPs, 4.75e+07 parameters, 189MB
+sobp-swinunetr-v6: 3.11e+01 GFLOPs, 1.57e+07 parameters, 68MB
+sobp-unet-v3: 3.89 GFLOPs, 1.19e+06 parameters, 4.6MB
+sobp-segresnet-v3: 5.79 GFLOPs, 1.18e+06 parameters, 4.6MB
+
+SwinUNETR w/ DPB 31.2 GFLOPs, 4.75e+07 parameters, 28.0 min training time, 36ms inference time
+SwinUNETR: 3.11e+01 GFLOPs, 1.57e+07 parameters, 23.5 min training time, 30ms inference time
+UNet: 3.89 GFLOPs, 1.19e+06 parameters, 16.5 min training time, 13ms inference time
+SegResNet: 5.79 GFLOPs, 1.18e+06 parameters, 13.9 min training time, 6.5ms inference time
+sobp-swinunetr-v16: 3.11e+01 GFLOPs, 4.75e+07 parameters
+sobp-swinunetr-v17: 3.11e+01 GFLOPs, 4.75e+07 parameters
+sobp-swinunetr-v12: 3.11e+01 GFLOPs, 4.75e+07 parameters
+sobp-reverse-swinunetr-v1: 3.11e+01 GFLOPs, 4.75e+07 parameters
+sobp-reverse-swinunetr-v2: 3.11e+01 GFLOPs, 4.75e+07 parameters
+sobp-swinunetr-v21: 3.11e+01 GFLOPs, 4.75e+07 parameters
+head-sobp-segresnet-v1: 5.79e+00 GFLOPs, 1.18e+06 parameters
+head-sobp-swinunetr-v1: 3.10e+01 GFLOPs, 4.68e+07 parameters
+head-sobp-swinunetr-v1: 2.94e+02 GFLOPs, 4.68e+07 parameters
+head-sobp-dynunet-v1: 4.15e+02 GFLOPs, 2.21e+07 parameters
+head-sobp-ddpmunet-v1: 1.82e+02 GFLOPs, 7.00e+06 parameters
+head-sobp-dynunet-v2: 4.15e+02 GFLOPs, 2.21e+07 parameters
+head-sobp-nnFormer-v17: 1.90e+02 GFLOPs, 3.40e+08 parameters

@@ -1,0 +1,11 @@
+data/*
+!data/HN-CHUM-018/
+data/HN-CHUM-018/*
+!data/HN-CHUM-018/matRad-output.mat
+models/trained-models
+generate-dataset/pet-simulation-reconstruction/mcgpu-pet/*
+!generate-dataset/pet-simulation-reconstruction/mcgpu-pet/MCGPU-PET-vision.in
+!generate-dataset/pet-simulation-reconstruction/mcgpu-pet/materials
+positron-range-correction
+*Zone.Identifier
+*.pyc

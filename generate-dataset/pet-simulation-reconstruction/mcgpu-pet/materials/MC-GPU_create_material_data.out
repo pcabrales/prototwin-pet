@@ -1,0 +1,63 @@
+
+$ gfortran -O MC-GPU_create_material_data.f penelope.f -o MC-GPU_create_material_data.x
+$ ./MC-GPU_create_material_data.x
+  
+  
+          ***********************************
+          *** MC-GPU_create_material_data ***
+          ***********************************
+  
+  
+     Creating a material input file for MC-GPU.
+     This program reads a PENELOPE 2006 material file and outputs
+     a table with photon interaction mean free paths (MFP) and
+     data for Rayleigh and Compton interaction sampling.
+  
+  -- Enter the energy range to tabulate:  Emin, Emax (eg, 5000  125000):
+5000 515000
+
+  -- Enter the number of energy bins (eg, 8192):
+10200
+
+      - Energy bin width set to (EMAX-EMIN)/NBINS =  5.0000000000E+01
+  -- Enter the name of the PENELOPE 2006 material data file (eg, water.mat):
+water.mat
+
+  -- Enter the name of the output data filefor MC-GPU (eg, water.mcgpu)...
+water_5-515keV.mcgpu
+
+
+ Material data file:  water.mat                               
+  
+Processing material data. Please, wait...
+
+ **********************************
+ **   PENELOPE  (version 2006)   **
+ **********************************
+
+ EMIN = 5.0000E+03 eV,  EMAX = 5.1500E+05 eV
+
+
+ **********************
+ **   1st material   **
+ **********************
+
+ *** Simulation parameters:
+     Electron absorption energy = 5.0000E+03 eV
+       Photon absorption energy = 5.0000E+03 eV
+     Positron absorption energy = 5.0000E+03 eV
+ *** Warning: soft radiative losses are switched off
+      C1 = 0.0000E+00,       C2 = 0.0000E+00
+     WCC = 0.0000E+00 eV,   WCR = 1.0000E+01 eV
+
+ PENELOPE (v. 2006)  Material data file ...............
+ Material: WATER, LIQUID  (278)                                          
+ Mass density = 1.00000000E+00 g/cm**3
+ Number of elements in the molecule =  2
+    Element: H  (Z= 1), atoms/molecule = 2.00000000E+00
+    Element: O  (Z= 8), atoms/molecule = 1.00000000E+00
+ Mean excitation energy = 7.50000000E+01 eV
+ PENELOPE (v. 2006)  End of material data file ........
+   
+*** Material file correctly generated. Have a nice simulation!
+  
