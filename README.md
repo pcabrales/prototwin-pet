@@ -23,8 +23,7 @@ All files too heavy to include here are located on the Octopus PC (147.96.73.91)
 
 Begin by cloning the entire repository and navigating to the project directory:
 ```bash
-git clone https://github.com/pcabrales/prototwin.git
-cd /deep-learning-dose-activity-dictionary
+git clone https://github.com/pcabrales/prototwin-pet.git
 ```
 
 This is a Python-based project. Creating a conda environment is recommended to manage the dependencies. To make and activate conda enviroment with the necessary packages, run:
@@ -59,16 +58,16 @@ You will also need:
 - You only need to load `HEAD_AND_NECK.mat` in MatRad, which is included in the phantoms folder of the `matRad-master`.
 
 #### Option B: Use External Data 
-The data should containing the CT and RTSTRUCTs with the OAR and target tumor volumes in DICOM format 
+The data should contain the CT and RTSTRUCTs with the OAR and target tumor volumes in DICOM format 
 In our submitted article, we selected patient HN-CHUM-018 from the [Head-Neck-PET-CT dataset](https://www.cancerimagingarchive.net/collection/head-neck-pet-ct/), which is available to the public but requires registration and approval.
--  `INFOclinical_HN_Version2_30may2018.xlsx` file is used to select the patient. In octopus PC: `/home/pablo/HeadPlans/INFOclinical_HN_Version2_30may2018.xlsx`
-- `metadata.csv` to find the CT and RTSTRUCT files. In octopus PC: `/home/pablo/HeadPlans/Head-Neck-Dataset/metadata.csv`. Copy these files to `/home/pablo/prototwin/deep-learning-dose-activity-dictionary/helper-files` to keep them in the GitHub repository.
-- In a single folder, place the CT (`dcm` files for each axial slice) and RTSTRUCT (single `dcm` file) for MatRad processing. In our case: `/home/pablo/HeadPlans/HN-CHUM-018/data/matRad-HN-CHUM-018`. Also move the `CT` folder with the  `dcm` slices to `/home/pablo/HeadPlans/HN-CHUM-018/data/CT`.
+-  `INFOclinical_HN_Version2_30may2018.xlsx` file is used to select the patient.
+- `metadata.csv` to find the CT and RTSTRUCT files.
+- In a single folder, place the CT (`dcm` files for each axial slice) and RTSTRUCT (single `dcm` file) for MatRad processing. In this case: `/path/to/HeadPlans/HN-CHUM-018/data/matRad-HN-CHUM-018`. Also move the `CT` folder with the  `dcm` slices to `/path/to/HeadPlans/HN-CHUM-018/data/CT`.
 - Run `matRadGUI` in MATLAB and click "Load DICOM" in the Workflow box (top left). Select the directory with the click on the patient ID.
-- Save the .mat file by clicking "Import". Saved it to /`home/pablo/matRad-master/phantoms/HN-CHUM-018.mat`.
+- Save the .mat file by clicking "Import". Save it to `/path/to/matRad-master/phantoms/HN-CHUM-018.mat`.
 
 ### Step 1: MatRad for Treatment Planning 🎛️
-- After installing matRad, copy the provided `generate_dataset/matRad_head_protons.m` file to the matRad-master base directory and run it. This is basically the same example as provided in the `/matRad/examples/matRad_example5_protons.m` script, which you can find directly [here](https://github.com/e0404/matRad/blob/master/examples/matRad_example5_protons.m), but with the code to save the output parameters for the Monte Carlo simulation and the optimization angles for the article's HN-CHUM-018 patient. In our case, the path is: `/home/pablo/matRad-master/matRad_head_protons.m`
+- After installing matRad, copy the provided `generate_dataset/matRad_head_protons.m` file to the matRad-master base directory and run it. This is basically the same example as provided in the `/matRad/examples/matRad_example5_protons.m` script, which you can find directly [here](https://github.com/e0404/matRad/blob/master/examples/matRad_example5_protons.m), but with the code to save the output parameters for the Monte Carlo simulation and the optimization angles for the article's HN-CHUM-018 patient.
 
 
 ### Step 2: Generate Dataset 🛠️
@@ -86,19 +85,17 @@ python main.py
 Specify the dataset folder, which was saved in Step 5 in `data` (not included in the repository due to size).
 
 #### Outputs 📝
-- The model is saved to `/home/pablo/prototwin/deep-learning-dose-activity-dictionary/models/trained-models`.
-- Other results and images are saved in `/home/pablo/prototwin/deep-learning-dose-activity-dictionary/images` and `/home/pablo/prototwin/deep-learning-dose-activity-dictionary/models`.
+- The model is saved to `models/trained-models`. Not included in the repository due to size.
+- Other results and images are saved in `images` and `models`.
 
-### NOTE:
-- The `deep-learning-dose-activity-dictionary` name is outdated, since the project is currently called PROTOTWIN-PET.
 
 ## Repositorty Table of Contents 📑
-1. [Images](/deep-learning-dose-activity-dictionary/images)
-2. [Models](/deep-learning-dose-activity-dictionary/models)
+1. [Images](/images)
+2. [Models](/models)
 3. Testing, training, utility and main scripts
-4. [Data](/deep-learning-dose-activity-dictionary/data)
-5. [Dataset Generation](/deep-learning-dose-activity-dictionary/generate-dataset)
-6. [Config files](/deep-learning-dose-activity-dictionary/config-main)
+4. [Data](/data)
+5. [Dataset Generation](/generate-dataset)
+6. [Config files](/config-main)
 
 ## Images 🖼️
 - Sample slices comparing the treatment plan and the actual delivered, ground truth dosages, as well as the the estimated and the ground truth dosages for a given PET
