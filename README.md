@@ -38,6 +38,7 @@ You will also need:
 - To use a patient's data not already included in MatRad, include a dataset with CTs and OAR and target tumor volumes RTSTRUCTs
 - FRED Monte Carlo GPU v 3.70.0:
     - Install from the [official site](https://www.fred-mc.org/Manual_3.70/Download/Latest%20release.html#latestrelease)
+    - Set `FREDDIR` environment variable to `/path/to/fred` in `~/.bashrc`.
 - Code for Positron Range Correction (Híbrido, Paula Ibañez, UCM - Not included in the repository, not open-source yet)
 - MCGPU-PET software:
     - Install from the [official GitHub page](https://github.com/DIDSR/MCGPU-PET.git)
@@ -133,10 +134,5 @@ Specify the dataset folder, which was saved in Step 5 in `data` (not included in
 
 ## Config Files 📝
 - config-main: Contains`.py` config files with the initialization parameters for each patient's deep learning model training and testing.
-
----
-
-### Note: 
-All files too heavy to include here are located on the Octopus PC (147.96.73.91) and backups are saved in `/scratch/petgfn/PabloJr` on the `fistensor.fis.ucm.es` server.
 
 ---
