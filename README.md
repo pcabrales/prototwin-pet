@@ -24,7 +24,7 @@ Begin by cloning the entire repository and navigating to the project directory:
 git clone https://github.com/pcabrales/prototwin-pet.git
 ```
 
-This is a Python-based project. Creating a conda environment is recommended to manage the dependencies. To make and activate conda environment with the necessary packages, run:
+This is a Python-based project. Creating a conda environment is recommended to manage the dependencies. If conda is not already installed, install it from the [official site](https://www.anaconda.com/download/success). To make and activate the conda environment with the necessary packages, run:
 ```bash
 conda env create -f environment.yml
 conda activate prototwin-pet
