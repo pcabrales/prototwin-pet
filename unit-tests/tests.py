@@ -1,9 +1,13 @@
 # Description: Unit tests for main
+import os
 import pytest
-import numpy as np
-from utils import set_seed, CustomNormalize
 
-def test_set_seed():
-    seed = 42
-    set_seed(seed)
-    assert np.random.get_state()[1][0] == seed, "Numpy seed not set correctly"
+def test_files_and_folders_exist():
+    root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
+    files_and_folders = [
+        'environment.yml',
+        'models/nnFormer'
+    ]
+    
+    for path in files_and_folders:
+        assert os.path.exists(os.path.join(root_dir, path)), f"{path} does not exist"

@@ -1,6 +1,10 @@
 # Description: Unit tests for generate-dataset
-import pytest
 import os
+import sys
+import pytest
+from unittest.mock import MagicMock
+sys.modules['scipy'] = MagicMock()
+sys.modules['itk'] = MagicMock()
 from utils import get_isotope_factors
 
 def test_get_isotope_factors():
