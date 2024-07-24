@@ -10,7 +10,7 @@ This repository was developed by Pablo Cabrales, PhD candidate at the Nuclear Ph
 
 ![](./images/workflow.jpg)
 
-PROTOTWIN-PET (PROTOn therapy digital TWIN models for dose verification with PET) is a patient-specific, realistic, GPU and deep learning-based workflow that integrates open-source, state-of-the-art tools and developed models to verify dose delivery in PT. PROTOTWIN-PET is demonstrated on an oropharynx cancer plan and deployed within a day to accurately estimate dose delivery deviations in PT. This enables timely treatment plan adaptations for subsequent sessions, improving the robustness of PT.
+PROTOTWIN-PET (PROTOn therapy digital TWIN models for dose verification with PET) is a patient-specific, realistic, GPU and deep learning-based workflow that integrates open-source, state-of-the-art tools and developed models to verify dose delivery in Proton Therapy (PT). PROTOTWIN-PET is demonstrated on an oropharynx cancer plan and deployed within a day to accurately estimate dose delivery deviations in PT. This enables timely treatment plan adaptations for subsequent sessions, improving the robustness of PT.
 
 The workflow starts with the treatment plan obtained from the patient’s CT scan one day before the first treatment session. Next, the dose verification approach (in-beam or off-line) is defined. Using the GPU Monte Carlo simulation tool Fred, deviations in the treatment plan that may occur in the clinical practice are simulated, producing pairs of positron emission and dose maps for each treatment deviation, or digital twin, of the patient. The positron emission maps are then converted to PET using GPU-based PET simulation and reconstruction tools, including a tissue-specific model for washout and positron range, scanner resolution, and Depth-Of-Interaction (DOI) effects.
 
@@ -64,16 +64,16 @@ source ~/.bashrc
 - You only need to load `HEAD_AND_NECK.mat` in MatRad, which is included in the `phantoms` folder of the `matRad-master`.
 
 #### Option B: Use External Data 
-The data should contain the CT and RTSTRUCTs with the OAR and target tumor volumes in DICOM format 
+The data should contain the CT and RTSTRUCTs with the OAR and target tumor volumes in DICOM format.
 In our study, we selected patient HN-CHUM-018 from the [Head-Neck-PET-CT dataset](https://www.cancerimagingarchive.net/collection/head-neck-pet-ct/), which is available to the public but requires registration and approval.
 -  `INFOclinical_HN_Version2_30may2018.xlsx` file is used to select the patient.
 - `metadata.csv` to find the CT and RTSTRUCT files.
-- In a single folder, place the CT (`dcm` files for each axial slice) and RTSTRUCT (single `dcm` file) for MatRad processing. In this case: `/path/to/HeadPlans/HN-CHUM-018/data/matRad-HN-CHUM-018`. Also, move the `CT` folder with the  `dcm` slices to `/path/to/HeadPlans/HN-CHUM-018/data/CT`.
-- Run `matRadGUI` in MATLAB and click "Load DICOM" in the Workflow box (top left). Select the directory with the click on the patient ID.
+- In a single folder, place the CT (`dcm` files for each axial slice) and RTSTRUCTs (single `dcm` file) for MatRad processing. An example folder path is `/path/to/HeadPlans/HN-CHUM-018/data/matRad-HN-CHUM-018`. Also, move the `CT` folder with the  `dcm` slices to `/path/to/HeadPlans/HN-CHUM-018/data/CT`.
+- Run `matRadGUI` in MATLAB and click "Load DICOM" in the Workflow box (top left). Select the directory by clicking on the patient ID.
 - Save the .mat file by clicking "Import". Save it to `/path/to/matRad-master/phantoms/HN-CHUM-018.mat`.
 
 ### Step 1: MatRad for Treatment Planning 🎛️
-- After installing matRad, copy the provided `generate_dataset/matRad_head_protons_prototwin_pet.m` file to the MatRad base directory and run it. This is basically the same example as provided in the `/matRad/examples/matRad_example5_protons.m` script, which you can find directly [here](https://github.com/e0404/matRad/blob/master/examples/matRad_example5_protons.m), but with the code to save the output parameters for the Monte Carlo simulation and the optimization angles for the article's HN-CHUM-018 patient.
+After installing matRad, copy the provided `generate_dataset/matRad_head_protons_prototwin_pet.m` file to the MatRad base directory and run it. This is basically the same example as provided in the `/matRad/examples/matRad_example5_protons.m` script, which you can find directly [here](https://github.com/e0404/matRad/blob/master/examples/matRad_example5_protons.m), but with the code to save the output parameters for the Monte Carlo simulation and the optimization angles for the patient.
 
 ### Step 2: Generate Dataset 🛠️
 Run the dataset generation script, changing the `USER-DEFINED PR0TOTWIN-PET PARAMETERS` inside the script as needed:
