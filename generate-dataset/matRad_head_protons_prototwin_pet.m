@@ -1,4 +1,4 @@
-%% Example: Proton Treatment Plan for the Head Plans in PROTOTWIN-PET
+%% Proton Treatment Plan for the Head Plans in PROTOTWIN-PET
 %er
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -23,8 +23,8 @@
 % Let's begin with a clear Matlab environment and import the data
 
 matRad_rc; %If this throws an error, run it from the parent directory first to set the paths
-load HN-CHUM-018.mat;  % selected patient from HEAD-NECK-PET-CT dataset
-% load HEAD_AND_NECK.mat;  % selected patient from CORT dataset
+% load HN-CHUM-018.mat;  % selected patient from HEAD-NECK-PET-CT dataset
+load HEAD_AND_NECK.mat;  % selected patient from CORT dataset
 % matRadGUI
 
 % cst(36, :) = [];  % to remove couch in order to add a posterior beam (from below the couch)

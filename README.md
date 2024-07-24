@@ -73,7 +73,7 @@ In our study, we selected patient HN-CHUM-018 from the [Head-Neck-PET-CT dataset
 - Save the .mat file by clicking "Import". Save it to `/path/to/matRad-master/phantoms/HN-CHUM-018.mat`.
 
 ### Step 1: MatRad for Treatment Planning 🎛️
-- After installing matRad, copy the provided `generate_dataset/matRad_head_protons_prototwin_pet.m` file to the `matRad-master` base directory and run it. This is basically the same example as provided in the `/matRad/examples/matRad_example5_protons.m` script, which you can find directly [here](https://github.com/e0404/matRad/blob/master/examples/matRad_example5_protons.m), but with the code to save the output parameters for the Monte Carlo simulation and the optimization angles for the article's HN-CHUM-018 patient.
+- After installing matRad, copy the provided `generate_dataset/matRad_head_protons_prototwin_pet.m` file to the MatRad base directory and run it. This is basically the same example as provided in the `/matRad/examples/matRad_example5_protons.m` script, which you can find directly [here](https://github.com/e0404/matRad/blob/master/examples/matRad_example5_protons.m), but with the code to save the output parameters for the Monte Carlo simulation and the optimization angles for the article's HN-CHUM-018 patient.
 
 ### Step 2: Generate Dataset 🛠️
 Run the dataset generation script, changing the `USER-DEFINED PR0TOTWIN-PET PARAMETERS` inside the script as needed:

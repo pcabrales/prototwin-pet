@@ -1,4 +1,4 @@
-name: Running unit tests
+name: Running unit tests for generate-dataset
 
 on: [push, pull_request]
 
@@ -30,4 +30,4 @@ jobs:
 
     - name: Run tests
       run: |
-        pytest unit-tests/utils_tests.py
+        pytest unit-tests/generate-dataset/tests.py

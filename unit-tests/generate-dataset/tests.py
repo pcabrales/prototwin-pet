@@ -1,5 +1,4 @@
-# deep-learning-dose-activity-dictionary/utils.py
-# Description: Unit tests for utils.py
+# Description: Unit tests for generate-dataset
 import pytest
 from utils import get_isotope_factors
 
@@ -12,3 +11,4 @@ def test_get_isotope_factors():
     result = get_isotope_factors(initial_time, final_time, irradiation_time, isotope_list)
     
     assert isinstance(result, dict), "The result should be a dictionary"
+
