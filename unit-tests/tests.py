@@ -6,7 +6,7 @@ def test_files_and_folders_exist():
     root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
     files_and_folders = [
         'environment.yml',
-        'models/nnFormer'
+        'models/nnFormer',
         'images/Times_New_Roman.ttf'
     ]
     
