@@ -87,7 +87,6 @@ Run the main script, changing the `USER-DEFINED PR0TOTWIN-PET PARAMETERS` inside
 ```bash
 python main.py
 ```
-Specify the dataset folder, which was saved in Step 5 in `data` (not included in the repository due to size).
 
 #### Outputs 📝
 - The model is saved to `models/trained-models`. Not included in the repository due to size.
