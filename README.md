@@ -4,7 +4,7 @@
 
 PROTOTWIN-PET is part of the PROTOTWIN project, which aims to develop dose verification methods for proton therapy using PET imaging. A link to the article will be provided once it is published.
 
-This repository was developed by Pablo Cabrales, PhD candidate at the Nuclear Physics Group, Complutense University of Madrid. Please e-mail [pcabrale@ucm.es](mailto: pcabrale@ucm.es) for any enquiries.
+This repository was developed by Pablo Cabrales, PhD candidate at the Nuclear Physics Group, Complutense University of Madrid. Please e-mail [pcabrale@ucm.es](mailto:pcabrale@ucm.es) for any enquiries.
 
 ## Introduction 📚
 

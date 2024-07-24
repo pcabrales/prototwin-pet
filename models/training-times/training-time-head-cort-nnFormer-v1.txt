@@ -1,1 +1,1 @@
-epoch 4 batch 36
+epoch 8 batch 83
