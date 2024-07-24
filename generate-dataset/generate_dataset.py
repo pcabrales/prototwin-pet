@@ -413,6 +413,7 @@ for sobp_num in range(sobp_start, sobp_start + N_sobps):
 
     del total_activity, total_dose, reconstructed_activity, activation_tissue
     gc.collect()
+    shutil.copy(deviations_path, os.path.join(npy_dataset_folder, "deviations.json.tmp"))
 
 # Copy deviations path to npy_location
 if not os.path.exists(os.path.join(npy_dataset_folder, "deviations.json")):

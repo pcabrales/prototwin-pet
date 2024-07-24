@@ -1,4 +1,4 @@
-
+import os
 import time
 from tqdm import tqdm
 import torch
@@ -8,7 +8,8 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 from matplotlib import font_manager
-font_path = '/usr/share/fonts/truetype/msttcorefonts/Times_New_Roman.ttf'
+script_dir = os.path.dirname(os.path.abspath(__file__))
+font_path = os.path.join(script_dir, 'images/Times_New_Roman.ttf')
 font_manager.fontManager.addfont(font_path)
 plt.rcParams['font.serif'] = 'Times New Roman'
 
