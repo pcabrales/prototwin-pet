@@ -1,5 +1,6 @@
 # Description: Unit tests for generate-dataset
 import pytest
+import os
 from utils import get_isotope_factors
 
 def test_get_isotope_factors():
@@ -12,3 +13,14 @@ def test_get_isotope_factors():
     
     assert isinstance(result, dict), "The result should be a dictionary"
 
+def test_files_and_folders_exist():
+    files_and_folders = [
+        'pet-simulation-reconstruction/mcgpu-pet/materials',
+        'pet-simulation-reconstruction/mcgpu-pet/MCGPU-PET-vision.in',
+        'ipot-hu2materials.txt',
+        'matRad_head_protons_prototwin_pet.m',
+        'original-fred.inp'
+    ]
+    
+    for path in files_and_folders:
+        assert os.path.exists(path), f"{path} does not exist"
