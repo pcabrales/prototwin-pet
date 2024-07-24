@@ -14,6 +14,7 @@ def test_get_isotope_factors():
     assert isinstance(result, dict), "The result should be a dictionary"
 
 def test_files_and_folders_exist():
+    root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../generate-dataset'))
     files_and_folders = [
         'pet-simulation-reconstruction/mcgpu-pet/materials',
         'pet-simulation-reconstruction/mcgpu-pet/MCGPU-PET-vision.in',
