@@ -24,4 +24,4 @@ def test_files_and_folders_exist():
     ]
     
     for path in files_and_folders:
-        assert os.path.exists(path), f"{path} does not exist"
+        assert os.path.exists(os.path.join(root_dir, path)), f"{path} does not exist"
