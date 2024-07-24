@@ -106,6 +106,7 @@ Specify the dataset folder, which was saved in Step 5 in `data` (not included in
 - Sample slices comparing the treatment plan and the actual delivered, ground truth dosages, as well as the estimated and the ground truth dosages for a given PET
 - Histograms of the errors in the predicted patient deviations
 - Training and validation losses vs number of epochs
+- Times New Roman font TTF file for the images
   
 ## Models 🧠
 - nnFormer: Implementation of the nnFormer model adapted from the [official GitHub page](https://github.com/282857341/nnFormer) and the [3D UX-Net implementation](https://github.com/MASILab/3DUX-Net.git). For more details on the architecture, refer to the [paper](https://arxiv.org/abs/2109.03201).
