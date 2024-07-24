@@ -31,7 +31,7 @@ conda activate prototwin-pet
 ```
 
 You will also need:
-- CUDA Toolkit 12.4 or higher
+- CUDA Toolkit 12.3 or higher. It may work with lower versions, but it has only been tested with 12.3 and 12.4.
 - matRad software:
     - The code currently works only with MatRad treatment planning
     - Install from the [official site](https://e0404.github.io/matRad/)
@@ -112,7 +112,7 @@ Specify the dataset folder, which was saved in Step 5 in `data` (not included in
 - nnFormer: Implementation of the nnFormer model adapted from the [official GitHub page](https://github.com/282857341/nnFormer) and the [3D UX-Net implementation](https://github.com/MASILab/3DUX-Net.git). For more details on the architecture, refer to the [paper](https://arxiv.org/abs/2109.03201).
     - It includes the code for the Deviation-Precting Branch (DPB), which outputs the displacement and rotation values of the patient that lead to dose deviations.
 - model_sizes.txt: File containing the sizes of the models in terms of parameters and FLOPs.
-- trained-models: Folder containing trained models (not included in the repository due to size).
+- trained-models: Folder containing trained models (no trained models included in the repository due to size).
 - losses: Folder containing the losses of the models during training as csv files.
 - test-results: Folder containing test metrics (MSE, Gamma Index, Gamma Value, PSNR, Set-Up prediction absolute error) for each model in txt files.
 - training-times: Folder containing txt files with the training duration.
