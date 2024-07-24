@@ -1,1 +1,1 @@
-epoch 71 batch 44
+Training time: 7269.686014413834 seconds. Best epoch: 599
