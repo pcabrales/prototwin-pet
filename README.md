@@ -89,7 +89,7 @@ python main.py
 ```
 
 #### Outputs 📝
-- The model is saved to `models/trained-models`. Not included in the repository due to size.
+- The model is saved to `models/trained-models`.
 - Other results and images are saved in `images` and `models`.
 
 
@@ -103,40 +103,40 @@ python main.py
 
 ## Images 🖼️
 - Sample slices comparing the treatment plan and the actual delivered, ground truth dosages, as well as the estimated and the ground truth dosages for a given PET
-- Histograms of the errors in the predicted patient deviations
+- Histograms of the errors in the predicted patient set-up deviations
 - Training and validation losses vs number of epochs
 - Times New Roman font TTF file for the images
   
 ## Models 🧠
 - nnFormer: Implementation of the nnFormer model adapted from the [official GitHub page](https://github.com/282857341/nnFormer) and the [3D UX-Net implementation](https://github.com/MASILab/3DUX-Net.git). For more details on the architecture, refer to the [paper](https://arxiv.org/abs/2109.03201).
-    - It includes the code for the Deviation-Precting Branch (DPB), which outputs the displacement and rotation values of the patient that lead to dose deviations.
-- model_sizes.txt: File containing the sizes of the models in terms of parameters and FLOPs.
-- trained-models: Folder containing trained models (no trained models included in the repository due to size).
-- losses: Folder containing the losses of the models during training as csv files.
-- test-results: Folder containing test metrics (MSE, Gamma Index, Gamma Value, PSNR, Set-Up prediction absolute error) for each model in txt files.
-- training-times: Folder containing txt files with the training duration.
+    - It includes the developed code for the Deviation-Precting Branch (DPB), which outputs the displacement and rotation patient set-up errors that lead to dose deviations.
+- model_sizes.txt: File containing the sizes of the models in terms of parameters and FLOPs
+- trained-models: Folder containing trained models (no trained models included in the repository due to size)
+- losses: Folder containing the losses of the models during training as csv files
+- test-results: Folder containing test metrics (MSE, Gamma Index, Gamma Value, PSNR, Set-Up prediction absolute error) for each model in txt files
+- training-times: Folder containing txt files with the training duration
 
 ## Testing, training, utility, and main scripts 🏋️‍♂️
-- train_model.py: Script with the model training functions.
+- main.py: Main script to train and test the deep learning model
+- train_model.py: Script with the model training functions
 - test_model.py: Script with the model testing functions to save the results
-- utils.py: Various utility functions and helpers for the deep learning training and testing, including custom transforms, dataset classes and plotting functions, among others.
-- main.py: Main script to train and test the deep learning model.
+- utils.py: Various utility functions and helpers for the deep learning training and testing, including custom transforms, dataset classes and plotting functions.
 
 ## Data 📊
 - Folder containing the datasets with the PET (/activity) and dose (/dose) 3D images for the training and testing of the deep learning model, as well as the json file with the ground truth position displacements (deviations.json), the CT (CT.npy), and the sensitivity for the PET reconstruction (sensitivity.npy). The dataset is not included in the repository due to size.
 
 ## Dataset Generation 🛠️
+- generate_dataset.py: Script to generate the dataset for the deep learning model
 - config-generate-dataset: Contains`.py` config files with the initialization parameters for each patient's dataset generation 
-- timings: Folder containing the timings for each part of the dataset generation.
-- generate_dataset.py: Script to generate the dataset for the deep learning model.
-- ipot-hu2materials.txt: File with the HU to material conversion for the FRED simulation. ipot stands for ionization potential of the material.
-- original-fred.inp: Original FRED input file to be modified for the simulation.
-- utils.py, utils_parallelproj.py: Utility functions for the dataset generation.  
+- timings: Folder containing the timings for each part of the dataset generation
+- ipot-hu2materials.txt: File with the HU to material conversion for the FRED simulation. *ipot* stands for ionization potential of the material
+- original-fred.inp: Original FRED input file to be modified for the simulation
+- utils.py, utils_parallelproj.py: Utility functions for the dataset generation  
 - pet-simulation-reconstruction: 
     - mcgpu-pet: 
-        - MCGPU-PET-vision.in: input file for the MCGPU-PET simulation performed in `generate_dataset.py`. **DO NOT CHANGE THE MATERIALS LINES AT THE END OF THE FILE.**
+        - MCGPU-PET-vision.in: input file for the MCGPU-PET simulation. **DO NOT CHANGE THE MATERIALS PATHS AT THE END OF THE FILE.**
         - materials: Folder containing the material files for the MCGPU-PET simulation.
-        - MCGPU-PET.x: Executable for the MCGPU-PET simulation. NOT INCLUDED IN THE REPOSITORY, COMPILE FOR EACH DEVICE
+        - MCGPU-PET.x: Executable for the MCGPU-PET simulation. **NOT INCLUDED IN THE REPOSITORY, COMPILE FOR EACH DEVICE AS INSTRUCTED EARLIER**
 
 ## Config Files 📝
 - config-main: Contains`.py` config files with the initialization parameters for each patient's deep learning model training and testing.

@@ -1,1 +1,1 @@
-epoch 43 batch 113
+epoch 71 batch 44
