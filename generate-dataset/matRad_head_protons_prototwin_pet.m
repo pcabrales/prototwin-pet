@@ -110,12 +110,12 @@ load protons_Generic.mat
 machine_data = machine.data;
 dataToSave = {'ct', 'CT_cube', 'CT_resolution', 'CT_offset', 'cst', 'body_indices', 'stf', 'weights', 'machine_data'};
 %%% HN-CHUM-018
-output_folder_pc = '/home/pablo/HeadPlans/HN-CHUM-018';
-output_folder_repo = '/home/pablo/prototwin/deep-learning-dose-activity-dictionary/data/HN-CHUM-018';
+output_folder_pc = '/path/to/HeadPlans/HN-CHUM-018';
+output_folder_repo = '/path/to/prototwin-pet/data/HN-CHUM-018';
 
 %%% Head and Neck CORT
-% output_folder_pc = '/home/pablo/HeadPlans/head-cort';
-% output_folder_repo = '/home/pablo/prototwin/deep-learning-dose-activity-dictionary/data/head-cort';
+% output_folder_pc = '/path/to/head-cort';
+% output_folder_repo = '/path/to/prototwin-pet/data/head-cort';
 
 save(fullfile(output_folder_repo, 'matRad-output.mat'), dataToSave{:});
 save(fullfile(output_folder_pc, 'matRad-output.mat'), dataToSave{:});

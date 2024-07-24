@@ -38,16 +38,23 @@ You will also need:
 - To use a patient's data not already included in MatRad, include a dataset with CTs and OAR and target tumor volumes RTSTRUCTs
 - FRED Monte Carlo GPU v 3.70.0:
     - Install from the [official site](https://www.fred-mc.org/Manual_3.70/Download/Latest%20release.html#latestrelease)
-    - Set `FREDDIR` environment variable to `/path/to/fred` in `~/.bashrc`.
 - Code for Positron Range Correction (Híbrido, Paula Ibañez, UCM - Not included in the repository, not open-source yet)
 - MCGPU-PET software:
     - Install from the [official GitHub page](https://github.com/DIDSR/MCGPU-PET.git)
-    - As instructed in the `README.md` compile and place in `/generate-dataset/pet-simulation-reconstruction/mcgpu-pet/MCGPU-PET.x`
+    - In the `Makefile` line:
+        ```bash
+        GPU_COMPUTE_CAPABILITY = -gencode=arch=compute_75,code=sm_75
+        ```
+        change the `75` to match your GPU compute capabilities.
+        For example, for a GPU with compute capability 8.9, change `75` to `89`. For a list of compute capabilities, refer to the [CUDA GPUs](https://developer.nvidia.com/cuda-gpus) page.
+    - If your CUDA does not include the `samples` folder, you will need to download the [cuda-samples repository](https://github.com/NVIDIA/cuda-samples.git) and place it in the `CUDA` directory. Then, in the `Makefile`, change the `CUDA_SDK_PATH` to `/path/to/cuda-samples/Common/`.
+    - Install as instructed in the `README.md` and place the `MCGPU-PET.x` executable in `/generate-dataset/pet-simulation-reconstruction/mcgpu-pet/`
+    - The input file `MCGPU-PET-vision.in` is already included in `/generate-dataset/pet-simulation-reconstruction/mcgpu-pet`
 
-#### Optional (to run helper and exploratory files, not included in the `.yml`):
-    - pydicom
-    - SimpleITK
-
+After installing the necessary software, restart the terminal or update the environment variables:
+```bash
+source ~/.bashrc
+```
 
 ## Usage 🚀
 
@@ -66,7 +73,7 @@ In our study, we selected patient HN-CHUM-018 from the [Head-Neck-PET-CT dataset
 - Save the .mat file by clicking "Import". Save it to `/path/to/matRad-master/phantoms/HN-CHUM-018.mat`.
 
 ### Step 1: MatRad for Treatment Planning 🎛️
-- After installing matRad, copy the provided `generate_dataset/matRad_head_protons.m` file to the `matRad-master` base directory and run it. This is basically the same example as provided in the `/matRad/examples/matRad_example5_protons.m` script, which you can find directly [here](https://github.com/e0404/matRad/blob/master/examples/matRad_example5_protons.m), but with the code to save the output parameters for the Monte Carlo simulation and the optimization angles for the article's HN-CHUM-018 patient.
+- After installing matRad, copy the provided `generate_dataset/matRad_head_protons_prototwin_pet.m` file to the `matRad-master` base directory and run it. This is basically the same example as provided in the `/matRad/examples/matRad_example5_protons.m` script, which you can find directly [here](https://github.com/e0404/matRad/blob/master/examples/matRad_example5_protons.m), but with the code to save the output parameters for the Monte Carlo simulation and the optimization angles for the article's HN-CHUM-018 patient.
 
 ### Step 2: Generate Dataset 🛠️
 Run the dataset generation script, changing the `USER-DEFINED PR0TOTWIN-PET PARAMETERS` inside the script as needed:
@@ -109,7 +116,6 @@ Specify the dataset folder, which was saved in Step 5 in `data` (not included in
 - test-results: Folder containing test metrics (MSE, Gamma Index, Gamma Value, PSNR, Set-Up prediction absolute error) for each model in txt files.
 - training-times: Folder containing txt files with the training duration.
 
-
 ## Testing, training, utility, and main scripts 🏋️‍♂️
 - train_model.py: Script with the model training functions.
 - test_model.py: Script with the model testing functions to save the results
@@ -128,7 +134,7 @@ Specify the dataset folder, which was saved in Step 5 in `data` (not included in
 - utils.py, utils_parallelproj.py: Utility functions for the dataset generation.  
 - pet-simulation-reconstruction: 
     - mcgpu-pet: 
-        - MCGPU-PET-vision.in: input file for the MCGPU-PET simulation performed in `generate_dataset.py`.
+        - MCGPU-PET-vision.in: input file for the MCGPU-PET simulation performed in `generate_dataset.py`. **DO NOT CHANGE THE MATERIALS LINES AT THE END OF THE FILE.**
         - materials: Folder containing the material files for the MCGPU-PET simulation.
         - MCGPU-PET.x: Executable for the MCGPU-PET simulation. NOT INCLUDED IN THE REPOSITORY, COMPILE FOR EACH DEVICE
 
