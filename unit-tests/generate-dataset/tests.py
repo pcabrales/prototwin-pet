@@ -3,7 +3,7 @@ import os
 import sys
 import pytest
 from unittest.mock import MagicMock
-sys.modules['scipy'] = MagicMock()
+sys.modules['scipy.ndimage'] = MagicMock()
 sys.modules['itk'] = MagicMock()
 from utils import get_isotope_factors
 
