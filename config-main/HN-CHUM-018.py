@@ -2,7 +2,7 @@
 # USER-DEFINED PR0TOTWIN-PET PARAMETERS
 # ----------------------------------------------------------------------------------------------------------------------------------------
 #
-seed = 42 # Set the seed for reproducibility
+seed = 43 # Set the seed for reproducibility
 patient_name = "HN-CHUM-018"  # DEFINE THE PATIENT NAME
 model_name = f"{patient_name}-nnFormer-v1"  # DEFINE THE MODEL NAME
 dataset_dir = os.path.join(script_dir, f"data/{patient_name}/dataset1")  # DEFINE THE PET-DOSE DATASET LOCATION

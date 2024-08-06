@@ -1,6 +1,6 @@
 # PROTOTWIN-PET
 
-![](./images/head-sobp-nnFormer-v17-seed43-single-sample.jpg)
+![](./images/head-sobp-nnFormer-v17-single-sample.jpg)
 
 PROTOTWIN-PET is part of the PROTOTWIN project, which aims to develop dose verification methods for proton therapy using PET imaging. A link to the article will be provided once it is published.
 
