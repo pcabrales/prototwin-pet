@@ -8,7 +8,7 @@ This repository was developed by Pablo Cabrales, PhD candidate at the Nuclear Ph
 
 ## Introduction 📚
 
-![](./images/workflow.jpg)
+![](./images/workflow-v2.jpg)
 
 PROTOTWIN-PET (PROTOn therapy digital TWIN models for dose verification with PET) is a patient-specific, realistic, GPU and deep learning-based workflow that integrates open-source, state-of-the-art tools and developed models to verify dose delivery in Proton Therapy (PT). PROTOTWIN-PET is demonstrated on an oropharynx cancer plan and deployed within a day to accurately estimate dose delivery deviations in PT. This enables timely treatment plan adaptations for subsequent sessions, improving the robustness of PT.
 
