@@ -141,4 +141,7 @@ python main.py
 ## Config Files 📝
 - config-main: Contains`.py` config files with the initialization parameters for each patient's deep learning model training and testing.
 
+## License 📄
+This project is under a GNU General Public License v3.0.
+
 ---
