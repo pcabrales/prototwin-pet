@@ -104,6 +104,7 @@ def gen_voxel(CT, activity_array, out_path, hu2densities_path, nvox=(248, 140, 1
             density = line_parts[2]
             hu_2_density_map[int(hu)] = float(density)
 
+    CT = np.round(CT).astype(int)
     hu_2_density_vectorized_mapping = np.vectorize(hu_2_density_map.get)
     density_array = hu_2_density_vectorized_mapping(CT)
     material_array = np.argmin(np.abs(density_array[..., None] - densities), axis=-1) + 1
