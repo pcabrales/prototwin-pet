@@ -7,7 +7,7 @@ def test_files_and_folders_exist():
     files_and_folders = [
         'environment.yml',
         'models/nnFormer',
-        'images/Times_New_Roman.ttf'
+        'images/Times_New_Roman.ttf',
         'data/ipot-hu2materials.txt',
     ]
     
