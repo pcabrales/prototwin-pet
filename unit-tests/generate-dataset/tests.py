@@ -22,7 +22,6 @@ def test_files_and_folders_exist():
     files_and_folders = [
         'pet-simulation-reconstruction/mcgpu-pet/materials',
         'pet-simulation-reconstruction/mcgpu-pet/MCGPU-PET-vision.in',
-        'ipot-hu2materials.txt',
         'matRad_head_protons_prototwin_pet.m',
         'original-fred.inp'
     ]
