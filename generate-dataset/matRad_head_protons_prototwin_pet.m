@@ -96,15 +96,15 @@ resultGUI = matRad_fluenceOptimization(dij,cst,pln);
 
 %% Save the output
 names = cst(:,2);
-% Find names that include 'PTV' (case-insensitive)
-matches = cellfun(@(x) contains(x, 'PTV', 'IgnoreCase', true), names);
-% Get the row indices where the names include 'PTV'
-row_ptv_indices = find(matches);
-% Extract PTV_indices from cst{row_ptv_indices,4}{1,1}
-PTV_indices_cells = cellfun(@(x) x{1,1}, cst(row_ptv_indices,4), 'UniformOutput', false);
-PTV_indices = cell2mat(PTV_indices_cells);
-% Get unique PTV_indices
-PTV_indices = unique(PTV_indices);
+% Find names that include 'CTV' (case-insensitive)
+matches = cellfun(@(x) contains(x, 'CTV', 'IgnoreCase', true), names);
+% Get the row indices where the names include 'CTV'
+row_CTV_indices = find(matches);
+% Extract CTV_indices from cst{row_CTV_indices,4}{1,1}
+CTV_indices_cells = cellfun(@(x) x{1,1}, cst(row_CTV_indices,4), 'UniformOutput', false);
+CTV_indices = cell2mat(CTV_indices_cells);
+% Get unique CTV_indices
+CTV_indices = unique(CTV_indices);
 
 CT_cube = ct.cubeHU{1, 1};
 CT_resolution = [ct.resolution.x, ct.resolution.y, ct.resolution.z];
@@ -113,7 +113,7 @@ weights = resultGUI.w;
 load protons_Generic.mat
 machine_data = machine.data;
 dataToSave = {'ct', 'CT_cube', 'CT_resolution', 'CT_offset', 'cst', 
-    'body_indices', 'PTV_indices', 'stf', 'weights', 'machine_data'};
+    'body_indices', 'CTV_indices', 'stf', 'weights', 'machine_data'};
 
 output_folder_repo = sprintf('/home/pablo/prototwin-pet/data/%s', patient_name);
 

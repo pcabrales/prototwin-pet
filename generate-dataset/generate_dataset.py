@@ -73,8 +73,8 @@ variance_reduction = True
 maxNumIterations = 10  # Number of times the simulation is repeated (only if variance reduction is True)
 stratified_sampling = True
 Espread = 0.006  # fractional energy spread (0.6%)
-target_dose = 2.13  # Gy  (corresponds to a standard 72 Gy, 33 fractions treatment)
-###N_reference = 2e6  # reference number of particles per bixel
+target_dose = 2.18  # Gy  (corresponds to a standard 72 Gy, 33 fractions treatment)
+
 #
 # PET SIMULATION
 scanner = "vision"  # only scanner implemented so far
@@ -203,17 +203,20 @@ body_coords = (
     body_coords[0],
 )  # Adjusting from MATLAB to Python
 
-# Importing the PTV to find the dose inside it
-PTV_indices = matRad_output["PTV_indices"].T[0]  # Before: cst[32, 3][0][0].T[0]
-PTV_indices -= 1  # 0-based indexing, from MATLAB to Python
-PTV_coords = xp.unravel_index(
-    PTV_indices, [uncropped_shape[2], uncropped_shape[1], uncropped_shape[0]]
+# Importing the CTV to find the dose inside it
+CTV_indices = matRad_output["CTV_indices"].T[0]  # Before: cst[32, 3][0][0].T[0]
+CTV_indices -= 1  # 0-based indexing, from MATLAB to Python
+CTV_coords = xp.unravel_index(
+    CTV_indices, [uncropped_shape[2], uncropped_shape[1], uncropped_shape[0]]
 )  # Convert to multi-dimensional form
-PTV_coords = (
-    PTV_coords[1],
-    PTV_coords[2],
-    PTV_coords[0],
+CTV_coords = (
+    CTV_coords[1],
+    CTV_coords[2],
+    CTV_coords[0],
 )  # Adjusting from MATLAB to Python
+CTV_mask = np.zeros(uncropped_shape, dtype=bool)
+CTV_mask[CTV_coords] = True
+CTV_mask = CTV_mask[xmin:xmax, ymin:ymax, :]
 
 HU_regions = [
     -1000,
@@ -500,31 +503,16 @@ for sobp_num in range(sobp_start, sobp_start + N_sobps):
                 activation_tissue[tissue_mask] *= field_factor_dict[isotope][tissue]
                 activation_tissue[~tissue_mask] = 0
                 activity_isotope_dict[isotope] += activation_tissue
-
-    # Scaling the dose and activity to the target dose
-    ### plot the hist of dose values and save
-    plt.figure()
-    plt.hist(total_dose[total_dose > 0.0].flatten(), bins=50)
-    plt.title(
-        f"Max dose: {total_dose.max():.4f}, 99th percentile: {np.percentile(total_dose[total_dose > 0.], 99):.4f}, 99.9th percentile: {np.percentile(total_dose[total_dose > 0.], 99.9):.4f}"
-    )
-    plt.savefig(os.path.join(dataset_folder, f"hist_dose{sobp_num}.png"))
-    # total_dose = total_dose / total_dose.max() * target_dose
+    
+    # Scaling the dose to the target dose
+    # this is done by matching the median dose in the CTV to the target dose (as found acceptable in https://doi.org/10.1186/s13014-022-02143-x)
+    total_dose_CTV = total_dose[CTV_mask]
+    scaling_factor = target_dose / np.median(total_dose_CTV)
+    total_dose = total_dose * scaling_factor
     for isotope in isotope_list:
-        # activity_isotope_dict[isotope] = (
-        #     activity_isotope_dict[isotope] / total_dose.max()
-        # ) * target_dose
+        activity_isotope_dict[isotope] = activity_isotope_dict[isotope] * scaling_factor
         total_activity += activity_isotope_dict[isotope]
     
-    PTV_mask = np.zeros(uncropped_shape, dtype=bool)
-    PTV_mask[PTV_coords] = True
-    PTV_mask = PTV_mask[xmin:xmax, ymin:ymax, :]
-    total_dose_PTV = total_dose[PTV_mask]
-    print(f"Max dose in PTV: {total_dose_PTV.max():.4f} Gy")
-    print(f"Mean dose in PTV: {total_dose_PTV.mean():.4f} Gy")
-    print(f"Min dose in PTV: {total_dose_PTV.min():.4f} Gy")
-    print(f"Std dose in PTV: {total_dose_PTV.std():.4f} Gy")
-    ###
 
     ## MCGPU-PET Simulation
     sobp_i_location = os.path.join(dataset_folder, f"sobp{sobp_num}")
@@ -643,12 +631,12 @@ for sobp_num in range(sobp_start, sobp_start + N_sobps):
         )
         cbar.set_label("Dose (Gy)")
         ax[3].imshow(CT_final[:, CT_final.shape[1] // 2, :].T, cmap="gray")
-        # add PTV
-        PTV_mask_path = os.path.join(patient_folder, "PTV_mask.npy")
-        PTV_mask = crop_save_npy(
-            PTV_mask, PTV_mask_path, raw_path=None, Trans=Trans, HL=final_shape // 2
+        # add CTV
+        CTV_mask_path = os.path.join(patient_folder, "CTV_mask.npy")
+        CTV_mask = crop_save_npy(
+            CTV_mask, CTV_mask_path, raw_path=None, Trans=Trans, HL=final_shape // 2
         )
-        ax[3].imshow(PTV_mask[:, PTV_mask.shape[1] // 2, :].T, cmap="jet", alpha=0.5)
+        ax[3].imshow(CTV_mask[:, CTV_mask.shape[1] // 2, :].T, cmap="jet", alpha=0.5)
         ax[3].set_title("CT")
         plt.tight_layout()
         plt.savefig(os.path.join(dataset_folder, f"plot{sobp_num}.png"))
@@ -656,7 +644,6 @@ for sobp_num in range(sobp_start, sobp_start + N_sobps):
     del total_activity, total_dose, reconstructed_activity, activation_tissue
     gc.collect()
     shutil.copy(deviations_path, os.path.join(dataset_folder, "deviations.json.tmp"))
-    stop  ###
 
 # Remove unnecessary files
 for sobp_num in range(sobp_start, sobp_start + N_sobps):

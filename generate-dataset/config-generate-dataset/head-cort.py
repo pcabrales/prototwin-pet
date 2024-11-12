@@ -8,15 +8,19 @@
 dataset_num = 1
 seed_number = 42
 patient_name = 'head-cort'
-patient_folder = os.path.join(script_dir, f'../../../HeadPlans/{patient_name}')  # Folder with the patient's treatment plan
-dataset_folder = os.path.join(patient_folder, f"dataset{dataset_num}")  # Folder to save the dataset
-npy_patient_folder = os.path.join(script_dir, f"../data/{patient_name}")  # Folder to save the numpy arrays for model training
-npy_dataset_folder = os.path.join(npy_patient_folder, f"dataset{dataset_num}")  # Folder to save the numpy arrays for model training
-# Path to the DICOM directory
-dicom_dir = None
-mhd_file = os.path.join(patient_folder, 'CT.mhd') # mhd file with the CT
+patient_folder = os.path.join(
+    script_dir, f"../data/{patient_name}"
+)  # Folder to save the numpy arrays for model training
+dataset_folder = os.path.join(
+    patient_folder, f"dataset{dataset_num}"
+)  # Folder to save the numpy arrays for model training
+# Path to the DICOM directory (only if necessary, currently the CT can be loaded from matRad-output.mat)
+dicom_dir = None  # os.path.join(patient_folder, 'data/CT')
+mhd_file = os.path.join(patient_folder, "CT.mhd")  # mhd file with the CT
 # Load matRad treatment plan parameters (CURRENTLY ONLY SUPPORTS MATRAD OUTPUT)
-matRad_output = loadmat(os.path.join(script_dir, f"../data/{patient_name}/matRad-output.mat"))
+matRad_output = loadmat(
+    os.path.join(script_dir, f"../data/{patient_name}/matRad-output.mat")
+)
 uncropped_shape = [161, 161, 67]  # Uncropped CT shape
 cropped_shape = (161, 161, 67)  # Cropped CT including the body, removing empty areas
 xmin, ymin = 0, 0
@@ -39,7 +43,7 @@ variance_reduction = True
 maxNumIterations = 10  # Number of times the simulation is repeated (only if variance reduction is True)
 stratified_sampling = True
 Espread = 0.006  # fractional energy spread (0.6%)
-N_reference = 2e6  # reference number of particles per bixel
+target_dose = 2.18  # Gy  (corresponds to a standard 72 Gy, 33 fractions treatment)
 #
 # PET SIMULATION
 scanner = 'vision'  # only scanner implemented so far
