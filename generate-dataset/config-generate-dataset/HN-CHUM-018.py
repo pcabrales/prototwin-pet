@@ -8,7 +8,7 @@
 dataset_num = 1
 seed_number = 42
 patient_name = 'HN-CHUM-018'
-patient_folder = os.path.join(script_dir, f'../../../HeadPlans/{patient_name}')  # Folder with the patient's treatment plan
+patient_folder = os.path.join(script_dir, f'../../HeadPlans/{patient_name}')  # Folder with the patient's treatment plan
 dataset_folder = os.path.join(patient_folder, f"dataset{dataset_num}")  # Folder to save the dataset
 npy_patient_folder = os.path.join(script_dir, f"../data/{patient_name}")  # Folder to save the numpy arrays for model training
 npy_dataset_folder = os.path.join(npy_patient_folder, f"dataset{dataset_num}")  # Folder to save the numpy arrays for model training
@@ -30,11 +30,11 @@ initial_time = 10  # minutes time spent before placing the patient in a PET scan
 final_time = 40  # minutes
 irradiation_time = 2  # minutes  # time spent delivering the field
 field_setup_time = 2  # minutes  # time spent setting up the field (gantry rotation)
-isotope_list = ['C11', 'N13', 'O15', 'K38'] #, 'C10', 'O14', 'P30']  ### For WASHOUT_CURVE only C11
+isotope_list = ['C11', 'N13', 'O15', 'K38']
 #
 #   MONTE CARLO SIMULATION OF THE TREATMENT
-N_sobps = 1 ###200
-nprim = 1e3###2.8e5 # number of primary particles
+N_sobps = 200
+nprim = 2.8e5 # number of primary particles
 variance_reduction = True
 maxNumIterations = 10  # Number of times the simulation is repeated (only if variance reduction is True)
 stratified_sampling = True

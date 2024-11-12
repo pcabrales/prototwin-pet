@@ -4,8 +4,8 @@ field<
     ID = Phantom
     O=[0, 0, 0]
     pivot=[0.5, 0.5, 0.5]
-    L=[48.3, 48.3, 33.5]
-    CTscan=/home/pablo/prototwin-pet/generate-dataset/../../HeadPlans/head-cort/CT.mhd
+    L=[53.12432, 53.12432, 26.4]
+    CTscan=/home/pablo/prototwin-pet/generate-dataset/../data/HN-CHUM-018/CT.mhd
 field>
 
 # Conversión de HU a material:

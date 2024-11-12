@@ -11,13 +11,13 @@
 #[SECTION SIMULATION CONFIG v.2016-07-05]
 42                              # RANDOM SEED (ranecu PRNG; enter 0 to use a random random seed based on current time)
 0                               # GPU NUMBER TO USE WHEN MPI IS NOT USED, OR TO BE AVOIDED IN MPI RUNS
-32                             # GPU THREADS PER CUDA BLOCK (multiple of 32)
+32                             # GPU THREADS PER CUDA BLOCK (multiple of 32)  # For RTX 4080 Ti: 1024 ###
 1.0                             # FACTOR TO SCALE THE INPUT MATERIAL DENSITY (usually 1; a very small value is like all air)
 
 
 #[SECTION SOURCE PET SCAN v.2017-03-14]
 1800.0                             # TOTAL PET SCAN ACQUISITION TIME  [seconds]
- 663.25                        # ISOTOPE MEAN LIFE [s]  # mean-life not half-life
+ 663.25                        # ISOTOPE MEAN LIFE [s]  # Only considering C11 for now: 1223.4 / ln(2), mean-life not half-life;  lam_efectiva = ln (2) / 1223.4 s + ln(2) / 10000; Mean_life_efectiva = 1 / lam_efectiva
    1    0.0   # !!INPUT NOT USED: Activity read from iz
    0    0.0
    
@@ -25,7 +25,7 @@
 #[SECTION PHASE SPACE FILE v.2016-07-05] BIOGRAPH VISON Quadra PET/CT System SCANNER 
  MCGPU_PET.psf                  # OUTPUT PHASE SPACE FILE FILE NAME
  0.0  0.0  0.0  25.6  -41.0    # CYLINDRIC DETECTOR CENTER, HEIGHT, AND RADIUS: X, Y, Z, H, RADIUS [cm] (IF RADIUS<0: DETECTOR CENTERED AT THE CENTER OF THE VOXELIZED GEOMETRY)
- 40000000                      # PHASE SPACE FILE SIZE (MAXIMUM NUMBER OF ELEMENTS)
+ 200000000                      # PHASE SPACE FILE SIZE (MAXIMUM NUMBER OF ELEMENTS)
  1                              # REPORT TRUES (1), SCATTER (2), OR BOTH (0)
  1                              # REPORT PSF (1), SINOGRAM (2) or BOTH (0) 
 
@@ -49,13 +49,13 @@ mc-gpu_dose.dat                 # OUTPUT VOXEL DOSE FILE NAME
 25.6   # AXIAL FIELD OF VIEW (FOVz) in cm
 80     # NUMBER OF ROWS 
 760    # TOTAL NUMBER OF CRYSTALS
-380    # NUMBER OF ANGULAR BINS (NCRYSTALS/2)
-759    # NUMBER OF RADIAL BINS // 391
+3       # NUMBER OF ANGULAR BINS  # Does not affect for listmode; for sinogram (not used in prototwin-pet): 380 (NCRYSTALS/2)
+3       # NUMBER OF RADIAL BINS   # Does not affect for listmode; for sinogram (not used in prototwin-pet): 759 (2 * number of angular bins - 1)
 159    # NUMBER OF Z SLICES 2 * NUMBER OF ROWS - 1;  ADJUSTING FOR PARALLELPROJ
-250    # IMAGE RESOLUTION (NUMBER OF BINS IN THE IMAGE) only affects image_Trues.raw
-70     # NUMBER OF ENERGY BINS (NE)
-85     # MAXIMUM RING DIFFERENCE (MRD)
-11      # SPAN
+3    # IMAGE RESOLUTION (NUMBER OF BINS IN THE IMAGE) (radius/resolution?) solo afecta image_Trues.raw
+75      # NUMBER OF ENERGY BINS (NE)
+79     # MAXIMUM RING DIFFERENCE (MRD)   # Putting the maximum number (79) because it improves sensitivity image and for list (not sinogram) it does not matter
+79     # SPAN, USING PARALLELPROJ VALUE  # Putting the maximum number (79) because it improves sensitivity image and for list (not sinogram) it does not matter
 
 
 #[SECTION VOXELIZED GEOMETRY FILE v.2009-11-30]

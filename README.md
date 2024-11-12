@@ -68,7 +68,7 @@ The data should contain the CT and RTSTRUCTs with the OAR and target tumor volum
 In our study, we selected patient HN-CHUM-018 from the [Head-Neck-PET-CT dataset](https://www.cancerimagingarchive.net/collection/head-neck-pet-ct/), which is available to the public but requires registration and approval.
 -  `INFOclinical_HN_Version2_30may2018.xlsx` file is used to select the patient.
 - `metadata.csv` to find the CT and RTSTRUCT files.
-- In a single folder, place the CT (`dcm` files for each axial slice) and RTSTRUCTs (single `dcm` file) for MatRad processing. An example folder path is `/path/to/HeadPlans/HN-CHUM-018/data/matRad-HN-CHUM-018`. Also, move the `CT` folder with the  `dcm` slices to `/path/to/HeadPlans/HN-CHUM-018/data/CT`.
+- In a single folder, place the CT (`dcm` files for each axial slice) and RTSTRUCTs (single `dcm` file) for MatRad processing.
 - Run `matRadGUI` in MATLAB and click "Load DICOM" in the Workflow box (top left). Select the directory by clicking on the patient ID.
 - Save the .mat file by clicking "Import". Save it to `/path/to/matRad-master/phantoms/HN-CHUM-018.mat`.
 
@@ -123,13 +123,12 @@ python main.py
 - utils.py: Various utility functions and helpers for the deep learning training and testing, including custom transforms, dataset classes and plotting functions.
 
 ## Data 📊
-- Folder containing the datasets with the PET (/activity) and dose (/dose) 3D images for the training and testing of the deep learning model, as well as the json file with the ground truth position displacements (deviations.json), the CT (CT.npy), and the sensitivity for the PET reconstruction (sensitivity.npy). The dataset is not included in the repository due to size.
+- Folder containing the datasets with the PET (/activity) and dose (/dose) 3D images for the training and testing of the deep learning model, as well as the json file with the ground truth position displacements (deviations.json), the CT (CT.npy), the sensitivity for the PET reconstruction (sensitivity.npy) and the HU to material conversion (ipot-hu2materials.txt) for the FRED simulation. The dataset is not included in the repository due to size.
 
 ## Dataset Generation 🛠️
 - generate_dataset.py: Script to generate the dataset for the deep learning model
 - config-generate-dataset: Contains`.py` config files with the initialization parameters for each patient's dataset generation 
-- timings: Folder containing the timings for each part of the dataset generation
-- ipot-hu2materials.txt: File with the HU to material conversion for the FRED simulation. *ipot* stands for ionization potential of the material
+- timings: Folder containing the timings for each part of the dataset generation*ipot* stands for ionization potential of the material
 - original-fred.inp: Original FRED input file to be modified for the simulation
 - utils.py, utils_parallelproj.py: Utility functions for the dataset generation  
 - pet-simulation-reconstruction: 

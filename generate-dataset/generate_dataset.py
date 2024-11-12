@@ -25,44 +25,39 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(script_dir)
 dev = xp.cuda.Device(0)
 
+# Description: Configuration file for the HN-CHUM-018 patient of the HEAD-NECK-PET-CT dataset.
 # ----------------------------------------------------------------------------------------------------------------------------------------
 # USER-DEFINED PR0TOTWIN-PET PARAMETERS
 # ----------------------------------------------------------------------------------------------------------------------------------------
 #
 #   PATIENT DATA AND OUTPUT FOLDERS
-dataset_num = 1
+dataset_num = 2
 seed_number = 42
-patient_name = "head-cort"
+patient_name = "HN-CHUM-018"
 patient_folder = os.path.join(
-    script_dir, f"../../HeadPlans/{patient_name}"
-)  # Folder with the patient's treatment plan
-dataset_folder = os.path.join(
-    patient_folder, f"dataset{dataset_num}"
-)  # Folder to save the dataset
-npy_patient_folder = os.path.join(
     script_dir, f"../data/{patient_name}"
 )  # Folder to save the numpy arrays for model training
-npy_dataset_folder = os.path.join(
-    npy_patient_folder, f"dataset{dataset_num}"
+dataset_folder = os.path.join(
+    patient_folder, f"dataset{dataset_num}"
 )  # Folder to save the numpy arrays for model training
-# Path to the DICOM directory
-dicom_dir = None
+# Path to the DICOM directory (only if necessary, currently the CT can be loaded from matRad-output.mat)
+dicom_dir = None  # os.path.join(patient_folder, 'data/CT')
 mhd_file = os.path.join(patient_folder, "CT.mhd")  # mhd file with the CT
 # Load matRad treatment plan parameters (CURRENTLY ONLY SUPPORTS MATRAD OUTPUT)
 matRad_output = loadmat(
     os.path.join(script_dir, f"../data/{patient_name}/matRad-output.mat")
 )
-uncropped_shape = [161, 161, 67]  # Uncropped CT shape
-cropped_shape = (161, 161, 67)  # Cropped CT including the body, removing empty areas
-xmin, ymin = 0, 0
-xmax, ymax = 161, 161
-Trans = (0, 0, 0)  # Offset in the cropped image to get the final image
+uncropped_shape = [272, 272, 176]  # Uncropped CT shape
+xmin, xmax = 12, -12  # Crops in each dimension to remove empty areas
+ymin, ymax = 27, -105
+cropped_shape = (248, 140, 176)  # Cropped CT including the body, removing empty areas
+Trans = (0, 4, 5)  # Offset in the cropped image to get the final image
 final_shape = [
     128,
+    96,
     128,
-    64,
 ]  # Final shape for the images, considering only where activity and dose are present (irradiated areas)
-voxel_size = np.array([3, 3, 5])  # in mm
+voxel_size = np.array([1.9531, 1.9531, 1.5])  # in mm
 #
 #   CHOOSING A DOSE VERIFICATION APPROACH
 initial_time = 10  # minutes time spent before placing the patient in a PET scanner after the final field is delivered
@@ -78,11 +73,12 @@ variance_reduction = True
 maxNumIterations = 10  # Number of times the simulation is repeated (only if variance reduction is True)
 stratified_sampling = True
 Espread = 0.006  # fractional energy spread (0.6%)
-N_reference = 2e6  # reference number of particles per bixel
+target_dose = 2.13  # Gy  (corresponds to a standard 72 Gy, 33 fractions treatment)
+###N_reference = 2e6  # reference number of particles per bixel
 #
 # PET SIMULATION
 scanner = "vision"  # only scanner implemented so far
-mcgpu_location = os.path.join(script_dir, "pet-simulation-reconstruction/mcgpu-pet")
+mcgpu_location = os.path.join(script_dir, "./pet-simulation-reconstruction/mcgpu-pet")
 mcgpu_input_location = os.path.join(mcgpu_location, f"MCGPU-PET-{scanner}.in")
 mcgpu_executable_location = os.path.join(mcgpu_location, "MCGPU-PET.x")
 materials_path = os.path.join(mcgpu_location, "materials")
@@ -94,16 +90,13 @@ osem_iterations = 3
 
 if not os.path.exists(dataset_folder):
     os.makedirs(dataset_folder)
-if not os.path.exists(npy_dataset_folder):
-    print("Exists")
-    os.makedirs(npy_dataset_folder)
-    os.makedirs(os.path.join(npy_dataset_folder, "activity/"))
-    os.makedirs(os.path.join(npy_dataset_folder, "dose/"))
+    os.makedirs(os.path.join(dataset_folder, "activity/"))
+    os.makedirs(os.path.join(dataset_folder, "dose/"))
 
 # Move the mcgpu input to the patient folder
-shutil.copy(mcgpu_input_location, npy_dataset_folder)
+shutil.copy(mcgpu_input_location, dataset_folder)
 mcgpu_input_location = os.path.join(
-    npy_dataset_folder, os.path.basename(mcgpu_input_location)
+    dataset_folder, os.path.basename(mcgpu_input_location)
 )
 with open(mcgpu_input_location, "r") as file:
     lines = file.readlines()
@@ -111,6 +104,10 @@ keyword_materials = "mcgpu.gz"  # lines specifying the materials include this st
 for idx, input_line in enumerate(lines):
     if keyword_materials in input_line:
         lines[idx] = materials_path + input_line
+    elif "TOTAL PET SCAN ACQUISITION TIME" in input_line:
+        lines[
+            idx
+        ] = f"{(final_time - initial_time) * 60:.2f}            # TOTAL PET SCAN ACQUISITION TIME [seconds]\n"
 with open(mcgpu_input_location, "w") as file:
     file.writelines(lines)
 
@@ -141,7 +138,7 @@ L_list = [
 ]  # in cm
 L_line = f"    L=[{', '.join(map(str, L_list))}]"
 activation_line = f"activation: isotopes = [{', '.join(isotope_list)}];"  # activationCode=4TS-747-PSI"  # line introduced in the fred.inp file to score the activation
-hu2densities_path = os.path.join(script_dir, "ipot-hu2materials.txt")
+hu2densities_path = os.path.join(script_dir, "../data/ipot-hu2materials.txt")
 with open(hu2densities_path, "r+") as file:
     original_schneider_lines = file.readlines()
 
@@ -183,6 +180,8 @@ isocenter = stf[0, 0][5][0] / 10 - np.array(
 )  # in cm
 num_fields = stf.shape[1]
 
+N_reference = 2e6  # reference number of particles per bixel, not too relevant, will be scaled to the target dose, just needs to be large enough to avoid rounding errors when multiplying by the weights
+
 # Finding FWHM for each energy
 machine_data = matRad_output["machine_data"]
 energy_array = []
@@ -202,6 +201,18 @@ body_coords = (
     body_coords[1],
     body_coords[2],
     body_coords[0],
+)  # Adjusting from MATLAB to Python
+
+# Importing the PTV to find the dose inside it
+PTV_indices = matRad_output["PTV_indices"].T[0]  # Before: cst[32, 3][0][0].T[0]
+PTV_indices -= 1  # 0-based indexing, from MATLAB to Python
+PTV_coords = xp.unravel_index(
+    PTV_indices, [uncropped_shape[2], uncropped_shape[1], uncropped_shape[0]]
+)  # Convert to multi-dimensional form
+PTV_coords = (
+    PTV_coords[1],
+    PTV_coords[2],
+    PTV_coords[0],
 )  # Adjusting from MATLAB to Python
 
 HU_regions = [
@@ -241,6 +252,8 @@ dict_deviations = {}  # dictionary to save deviations
 # Fix the random seed
 random.seed(seed_number)
 np.random.seed(seed_number)
+xp.random.seed(seed_number)
+os.environ["PYTHONHASHSEED"] = str(seed_number)
 
 # Save raws (not saving them currently because they are too large)
 save_raw = False
@@ -259,16 +272,15 @@ CT_cropped = crop_save_image(
     ymin=ymin,
     ymax=ymax,
 )  # I need to save CT because I use it later
-np.save(os.path.join(npy_patient_folder, "CT_cropped.npy"), CT_cropped)
-CT_npy_path = os.path.join(npy_patient_folder, "CT.npy")
+np.save(os.path.join(patient_folder, "CT_cropped.npy"), CT_cropped)
+CT_npy_path = os.path.join(patient_folder, "CT.npy")
 CT_raw_path = None  # os.path.join(dataset_folder, 'CT_cropped.raw')
 crop_save_npy(
     CT_cropped, CT_npy_path, raw_path=CT_raw_path, Trans=Trans, HL=final_shape // 2
 )
-shutil.copy(CT_file_path, dataset_folder)
 
 # Generate the sensitivity for the reconstruction
-sensitivity_location = os.path.join(npy_patient_folder, f"sensitivity-{scanner}.npy")
+sensitivity_location = os.path.join(patient_folder, f"sensitivity-{scanner}.npy")
 if os.path.exists(sensitivity_location):
     sensitivity_array = np.load(
         sensitivity_location
@@ -488,7 +500,31 @@ for sobp_num in range(sobp_start, sobp_start + N_sobps):
                 activation_tissue[tissue_mask] *= field_factor_dict[isotope][tissue]
                 activation_tissue[~tissue_mask] = 0
                 activity_isotope_dict[isotope] += activation_tissue
-                total_activity += activation_tissue
+
+    # Scaling the dose and activity to the target dose
+    ### plot the hist of dose values and save
+    plt.figure()
+    plt.hist(total_dose[total_dose > 0.0].flatten(), bins=50)
+    plt.title(
+        f"Max dose: {total_dose.max():.4f}, 99th percentile: {np.percentile(total_dose[total_dose > 0.], 99):.4f}, 99.9th percentile: {np.percentile(total_dose[total_dose > 0.], 99.9):.4f}"
+    )
+    plt.savefig(os.path.join(dataset_folder, f"hist_dose{sobp_num}.png"))
+    # total_dose = total_dose / total_dose.max() * target_dose
+    for isotope in isotope_list:
+        # activity_isotope_dict[isotope] = (
+        #     activity_isotope_dict[isotope] / total_dose.max()
+        # ) * target_dose
+        total_activity += activity_isotope_dict[isotope]
+    
+    PTV_mask = np.zeros(uncropped_shape, dtype=bool)
+    PTV_mask[PTV_coords] = True
+    PTV_mask = PTV_mask[xmin:xmax, ymin:ymax, :]
+    total_dose_PTV = total_dose[PTV_mask]
+    print(f"Max dose in PTV: {total_dose_PTV.max():.4f} Gy")
+    print(f"Mean dose in PTV: {total_dose_PTV.mean():.4f} Gy")
+    print(f"Min dose in PTV: {total_dose_PTV.min():.4f} Gy")
+    print(f"Std dose in PTV: {total_dose_PTV.std():.4f} Gy")
+    ###
 
     ## MCGPU-PET Simulation
     sobp_i_location = os.path.join(dataset_folder, f"sobp{sobp_num}")
@@ -562,7 +598,7 @@ for sobp_num in range(sobp_start, sobp_start + N_sobps):
 
     # Cropping and saving:
     # Saving dose
-    dose_npy_path = os.path.join(npy_dataset_folder, f"dose/sobp{sobp_num}.npy")
+    dose_npy_path = os.path.join(dataset_folder, f"dose/sobp{sobp_num}.npy")
     dose_raw_path = None  # os.path.join(mhd_folder_path, 'Dose.raw')
     total_dose = crop_save_npy(
         total_dose,
@@ -576,7 +612,7 @@ for sobp_num in range(sobp_start, sobp_start + N_sobps):
     activity_raw_path = (
         None  # os.path.join(sobp_i_location, "reconstructed_activity.raw")
     )
-    activity_npy_path = os.path.join(npy_dataset_folder, f"activity/sobp{sobp_num}.npy")
+    activity_npy_path = os.path.join(dataset_folder, f"activity/sobp{sobp_num}.npy")
     reconstructed_activity = crop_save_npy(
         reconstructed_activity,
         activity_npy_path,
@@ -587,7 +623,7 @@ for sobp_num in range(sobp_start, sobp_start + N_sobps):
 
     # plot the central slice of the three saved arrays in three imshow rows
     CT_final = np.load(CT_npy_path)
-    if sobp_num < 10:
+    if sobp_num < 5:
         # Plot slice
         fig, ax = plt.subplots(4, 1, figsize=(3, 9))
         ax[0].imshow(total_activity[:, total_activity.shape[1] // 2, :].T, cmap="jet")
@@ -599,24 +635,28 @@ for sobp_num in range(sobp_start, sobp_start + N_sobps):
         ax[1].set_title("Activity")
         ax[2].imshow(total_dose[:, total_dose.shape[1] // 2, :].T, cmap="jet")
         ax[2].set_title("Dose")
+        # add colorbar for dose
+        cbar = plt.colorbar(
+            ax[2].imshow(total_dose[:, total_dose.shape[1] // 2, :].T, cmap="jet"),
+            ax=ax[2],
+            orientation="horizontal",
+        )
+        cbar.set_label("Dose (Gy)")
         ax[3].imshow(CT_final[:, CT_final.shape[1] // 2, :].T, cmap="gray")
+        # add PTV
+        PTV_mask_path = os.path.join(patient_folder, "PTV_mask.npy")
+        PTV_mask = crop_save_npy(
+            PTV_mask, PTV_mask_path, raw_path=None, Trans=Trans, HL=final_shape // 2
+        )
+        ax[3].imshow(PTV_mask[:, PTV_mask.shape[1] // 2, :].T, cmap="jet", alpha=0.5)
         ax[3].set_title("CT")
         plt.tight_layout()
         plt.savefig(os.path.join(dataset_folder, f"plot{sobp_num}.png"))
 
     del total_activity, total_dose, reconstructed_activity, activation_tissue
     gc.collect()
-    shutil.copy(
-        deviations_path, os.path.join(npy_dataset_folder, "deviations.json.tmp")
-    )
-
-# Copy deviations path to npy_location
-if not os.path.exists(os.path.join(npy_dataset_folder, "deviations.json")):
-    shutil.copy(deviations_path, os.path.join(npy_dataset_folder, "deviations.json"))
-else:
-    shutil.copy(
-        deviations_path, os.path.join(npy_dataset_folder, "deviations.json.tmp")
-    )
+    shutil.copy(deviations_path, os.path.join(dataset_folder, "deviations.json.tmp"))
+    stop  ###
 
 # Remove unnecessary files
 for sobp_num in range(sobp_start, sobp_start + N_sobps):
