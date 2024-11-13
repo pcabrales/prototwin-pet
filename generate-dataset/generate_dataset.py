@@ -48,10 +48,6 @@ matRad_output = loadmat(
     os.path.join(script_dir, f"../data/{patient_name}/matRad-output.mat")
 )
 uncropped_shape = [272, 272, 176]  # Uncropped CT shape
-xmin, xmax = 12, -12  # Crops in each dimension to remove empty areas
-ymin, ymax = 27, -105
-cropped_shape = (248, 140, 176)  # Cropped CT including the body, removing empty areas
-Trans = (0, 4, 5)  # Offset in the cropped image to get the final image
 final_shape = [
     128,
     96,
@@ -77,7 +73,7 @@ target_dose = 2.18  # Gy  (corresponds to a standard 72 Gy, 33 fractions treatme
 
 #
 # PET SIMULATION
-scanner = "vision"  # only scanner implemented so far
+scanner = "vision"  # Choose between "vision" and "quadra"
 mcgpu_location = os.path.join(script_dir, "./pet-simulation-reconstruction/mcgpu-pet")
 mcgpu_input_location = os.path.join(mcgpu_location, f"MCGPU-PET-{scanner}.in")
 mcgpu_executable_location = os.path.join(mcgpu_location, "MCGPU-PET.x")
@@ -87,6 +83,9 @@ materials_path = os.path.join(mcgpu_location, "materials")
 num_subsets = 2
 osem_iterations = 3
 # -----------------------------------------------------------------------------------------------------------------------------------------
+
+# make scanner into lowercase
+scanner = scanner.lower()
 
 if not os.path.exists(dataset_folder):
     os.makedirs(dataset_folder)
@@ -202,6 +201,26 @@ body_coords = (
     body_coords[2],
     body_coords[0],
 )  # Adjusting from MATLAB to Python
+body_mask = np.zeros(uncropped_shape, dtype=bool)
+body_mask[body_coords] = True
+
+# Get a maximal crop of the body for sensitivity calculation
+indices = np.where(body_mask)
+xmin, xmax = np.min(indices[0]), np.max(indices[0])
+ymin, ymax = np.min(indices[1]), np.max(indices[1])
+zmin, zmax = np.min(indices[2]), np.max(indices[2])
+with open(os.path.join(dataset_folder, "patient_info.txt"), "a") as patient_info_file:
+    patient_info_file.write(f"xmin: {xmin}, xmax: {xmax}\n")
+    patient_info_file.write(f"ymin: {ymin}, ymax: {ymax}\n")
+    patient_info_file.write(f"zmin: {zmin}, zmax: {zmax}\n")
+cropped_shape = (
+    - xmin + xmax,
+    - ymin + ymax,
+    - zmin + zmax,
+)  # Cropped CT including the body, removing empty areas
+Trans = (0, 0, 0)  # Offset in the cropped image to get the final image (removed it for easier processing)
+
+body_mask = body_mask[xmin:xmax, ymin:ymax, zmin:zmax]
 
 # Importing the CTV to find the dose inside it
 CTV_indices = matRad_output["CTV_indices"].T[0]  # Before: cst[32, 3][0][0].T[0]
@@ -216,7 +235,7 @@ CTV_coords = (
 )  # Adjusting from MATLAB to Python
 CTV_mask = np.zeros(uncropped_shape, dtype=bool)
 CTV_mask[CTV_coords] = True
-CTV_mask = CTV_mask[xmin:xmax, ymin:ymax, :]
+CTV_mask = CTV_mask[xmin:xmax, ymin:ymax, zmin:zmax]
 
 HU_regions = [
     -1000,
@@ -274,16 +293,18 @@ CT_cropped = crop_save_image(
     xmax=xmax,
     ymin=ymin,
     ymax=ymax,
+    zmin=zmin,
+    zmax=zmax,
 )  # I need to save CT because I use it later
-np.save(os.path.join(patient_folder, "CT_cropped.npy"), CT_cropped)
-CT_npy_path = os.path.join(patient_folder, "CT.npy")
+np.save(os.path.join(dataset_folder, "CT_cropped.npy"), CT_cropped)
+CT_npy_path = os.path.join(dataset_folder, "CT.npy")
 CT_raw_path = None  # os.path.join(dataset_folder, 'CT_cropped.raw')
 crop_save_npy(
     CT_cropped, CT_npy_path, raw_path=CT_raw_path, Trans=Trans, HL=final_shape // 2
 )
 
 # Generate the sensitivity for the reconstruction
-sensitivity_location = os.path.join(patient_folder, f"sensitivity-{scanner}.npy")
+sensitivity_location = os.path.join(dataset_folder, f"sensitivity-{scanner}.npy")
 if os.path.exists(sensitivity_location):
     sensitivity_array = np.load(
         sensitivity_location
@@ -297,7 +318,7 @@ else:
         mcgpu_input_location,
         sensitivity_location,
         hu2densities_path,
-        factor_activity=1.0,
+        factor_activity=1.,
     )
 
 # MCGPU-PET effective isotope mean lives (not half-lives)
@@ -315,7 +336,7 @@ mean_lives_no_washout = {
 sobp_start = 0
 for sobp_num in range(sobp_start, sobp_start + N_sobps):
     # Create folder for each new deviated plan, which we call sobp because of the original name for the prostate
-    sobp_folder_name = f"sobp{sobp_num}"
+    sobp_folder_name = f"plans_info/sobp{sobp_num}"
 
     # Deviations in physical parameters (density and composition) for each HU region
     HU_regions_deviations = [
@@ -458,6 +479,8 @@ for sobp_num in range(sobp_start, sobp_start + N_sobps):
             xmax=xmax,
             ymin=ymin,
             ymax=ymax,
+            zmin=zmin,
+            zmax=zmax,
             crop_body=True,
             body_coords=body_coords,
             save_raw=save_raw,
@@ -489,6 +512,8 @@ for sobp_num in range(sobp_start, sobp_start + N_sobps):
                 xmax=xmax,
                 ymin=ymin,
                 ymax=ymax,
+                zmin=zmin,
+                zmax=zmax,
                 uncropped_shape=uncropped_shape,
                 save_raw=save_raw,
                 crop_body=True,
@@ -515,7 +540,7 @@ for sobp_num in range(sobp_start, sobp_start + N_sobps):
     
 
     ## MCGPU-PET Simulation
-    sobp_i_location = os.path.join(dataset_folder, f"sobp{sobp_num}")
+    sobp_i_location = os.path.join(dataset_folder, sobp_folder_name)
     merged_raw_file = os.path.join(sobp_i_location, f"merged_MCGPU_PET.psf.raw")
     with open(merged_raw_file, "wb") as merged_file:
         pass  # Create an empty file to start with
@@ -632,7 +657,7 @@ for sobp_num in range(sobp_start, sobp_start + N_sobps):
         cbar.set_label("Dose (Gy)")
         ax[3].imshow(CT_final[:, CT_final.shape[1] // 2, :].T, cmap="gray")
         # add CTV
-        CTV_mask_path = os.path.join(patient_folder, "CTV_mask.npy")
+        CTV_mask_path = os.path.join(dataset_folder, "CTV_mask.npy")
         CTV_mask = crop_save_npy(
             CTV_mask, CTV_mask_path, raw_path=None, Trans=Trans, HL=final_shape // 2
         )
@@ -649,7 +674,7 @@ for sobp_num in range(sobp_start, sobp_start + N_sobps):
 for sobp_num in range(sobp_start, sobp_start + N_sobps):
     for field_num in range(num_fields):
         sobp_folder_location = os.path.join(
-            dataset_folder, f"sobp{sobp_num}/field{field_num}"
+            dataset_folder, f"plans_info/sobp{sobp_num}/field{field_num}"
         )
         # os.remove(os.path.join(sobp_folder_location, "out/dEdx.txt"))  # For FRED v 3.6
         os.remove(os.path.join(sobp_folder_location, "out/log/materials.txt"))

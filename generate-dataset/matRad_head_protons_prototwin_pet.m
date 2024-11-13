@@ -112,7 +112,7 @@ CT_offset = ct.dicomInfo.ImagePositionPatient;
 weights = resultGUI.w;
 load protons_Generic.mat
 machine_data = machine.data;
-dataToSave = {'ct', 'CT_cube', 'CT_resolution', 'CT_offset', 'cst', 
+dataToSave = {'ct', 'CT_cube', 'CT_resolution', 'CT_offset', 'cst', ...
     'body_indices', 'CTV_indices', 'stf', 'weights', 'machine_data'};
 
 output_folder_repo = sprintf('/home/pablo/prototwin-pet/data/%s', patient_name);

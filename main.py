@@ -24,7 +24,7 @@ sys.path.append(script_dir)
 # USER-DEFINED PR0TOTWIN-PET PARAMETERS
 # ----------------------------------------------------------------------------------------------------------------------------------------
 #
-dataset_num = 1  # Dataset number to use
+dataset_num = 2  # Dataset number to use
 seed = 42  # Set the seed for reproducibility
 patient_name = "head-cort"  # DEFINE THE PATIENT NAME
 model_name = f"{patient_name}-nnFormer-v1"  # DEFINE THE MODEL NAME
@@ -89,7 +89,7 @@ mean_output = dataset_statistics_dict[output_dir]["mean_output"]
 std_output = dataset_statistics_dict[output_dir]["std_output"]
 
 in_channels = 1
-CT = np.load(os.path.join(script_dir, f"data/{patient_name}/CT.npy"))
+CT = np.load(os.path.join(script_dir, f"data/{patient_name}/dataset{dataset_num}/CT.npy"))
 
 CT_flag = True  # To train with CT set to true
 if CT_flag:

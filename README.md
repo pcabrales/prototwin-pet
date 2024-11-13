@@ -49,7 +49,7 @@ You will also need:
         For example, for a GPU with compute capability 8.9, change `75` to `89`. For a list of compute capabilities, refer to the [CUDA GPUs](https://developer.nvidia.com/cuda-gpus) page.
     - If your CUDA does not include the `samples` folder, you will need to download the [cuda-samples repository](https://github.com/NVIDIA/cuda-samples.git) and place it in the `CUDA` directory. Then, in the `Makefile`, change the `CUDA_SDK_PATH` to `/path/to/cuda-samples/Common/`.
     - Install as instructed in the `README.md` and place the `MCGPU-PET.x` executable in `/generate-dataset/pet-simulation-reconstruction/mcgpu-pet/`
-    - The input file `MCGPU-PET-vision.in` is already included in `/generate-dataset/pet-simulation-reconstruction/mcgpu-pet`
+    - The input files `MCGPU-PET-vision.in` and `MCGPU-PET-quadra.in` already included in `/generate-dataset/pet-simulation-reconstruction/mcgpu-pet`
 
 After installing the necessary software, restart the terminal or update the environment variables:
 ```bash
@@ -133,7 +133,8 @@ python main.py
 - utils.py, utils_parallelproj.py: Utility functions for the dataset generation  
 - pet-simulation-reconstruction: 
     - mcgpu-pet: 
-        - MCGPU-PET-vision.in: input file for the MCGPU-PET simulation. **DO NOT CHANGE THE MATERIALS PATHS AT THE END OF THE FILE.**
+        - MCGPU-PET-vision.in: input file for the MCGPU-PET simulation with Siemens Vision PET. **DO NOT CHANGE THE MATERIALS PATHS AT THE END OF THE FILE.**
+        - MCGPU-PET-quadra.in: input file for the MCGPU-PET simulation with Siemens Quadra PET. **DO NOT CHANGE THE MATERIALS PATHS AT THE END OF THE FILE.**
         - materials: Folder containing the material files for the MCGPU-PET simulation.
         - MCGPU-PET.x: Executable for the MCGPU-PET simulation. **NOT INCLUDED IN THE REPOSITORY, COMPILE FOR EACH DEVICE AS INSTRUCTED EARLIER**
 

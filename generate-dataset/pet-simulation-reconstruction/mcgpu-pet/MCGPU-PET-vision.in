@@ -49,8 +49,8 @@ mc-gpu_dose.dat                 # OUTPUT VOXEL DOSE FILE NAME
 25.6   # AXIAL FIELD OF VIEW (FOVz) in cm
 80     # NUMBER OF ROWS 
 760    # TOTAL NUMBER OF CRYSTALS
-3       # NUMBER OF ANGULAR BINS  # Does not affect for listmode; for sinogram (not used in prototwin-pet): 380 (NCRYSTALS/2)
-3       # NUMBER OF RADIAL BINS   # Does not affect for listmode; for sinogram (not used in prototwin-pet): 759 (2 * number of angular bins - 1)
+380    # NUMBER OF ANGULAR BINS (NCRYSTALS/2)
+759    # NUMBER OF RADIAL BINS (NCRYSTALS-1)
 159    # NUMBER OF Z SLICES 2 * NUMBER OF ROWS - 1;  ADJUSTING FOR PARALLELPROJ
 3    # IMAGE RESOLUTION (NUMBER OF BINS IN THE IMAGE) (radius/resolution?) solo afecta image_Trues.raw
 75      # NUMBER OF ENERGY BINS (NE)

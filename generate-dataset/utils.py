@@ -5,6 +5,7 @@ import numpy as np
 import itk
 import gzip
 from scipy.ndimage import zoom
+import matplotlib.pyplot as plt
 
 def generate_sensitivity(
     img_shape, 
@@ -36,8 +37,14 @@ def generate_sensitivity(
     
     with gzip.open(os.path.join(mcgpu_location, "image_Trues.raw.gz"), 'rb') as f:
         sensitivity = np.frombuffer(f.read(), dtype=np.int32).reshape(img_shape, order='F').copy()
+        print(sensitivity.min(), sensitivity.max(), sensitivity.mean(), sensitivity.shape)###
     sensitivity[sensitivity==0] = 1  # to avoid dividing by zero, only happens at the edge of FOV
-    np.save(sensitivity_location, sensitivity)
+    np.save(sensitivity_location, sensitivity)    
+    
+    # plot the sensitivity
+    plt.figure()
+    plt.imshow(sensitivity[:, sensitivity.shape[1] // 2, :], cmap='jet')
+    plt.savefig(sensitivity_location[:-4] + '.jpg')
     
     # output the psf
     with open(mcgpu_input_location, 'r') as file:
@@ -134,14 +141,14 @@ def gen_voxel(CT, activity_array, out_path, hu2densities_path, nvox=(248, 140, 1
 
 def crop_save_npy(npy_array, npy_path, raw_path=None, Trans=(0, 0, 0), HL=(64, 48, 64)):
     # Trans is offset in each direction, HL is half-length of the cropped image
-    npy_array = npy_array[npy_array.shape[0] // 2 + Trans[0] - HL[0]: npy_array.shape[0] // 2 + Trans[0] + HL[0],
+    npy_array_cropped = npy_array[npy_array.shape[0] // 2 + Trans[0] - HL[0]: npy_array.shape[0] // 2 + Trans[0] + HL[0],
                           npy_array.shape[1] // 2 + Trans[1] - HL[1]: npy_array.shape[1] // 2 + Trans[1] + HL[1],
                           npy_array.shape[2] // 2 + Trans[2] - HL[2]: npy_array.shape[2] // 2 + Trans[2] + HL[2]] 
-    np.save(npy_path, npy_array)
+    np.save(npy_path, npy_array_cropped)
     if raw_path is not None:
-        npy_array_transposed = npy_array.transpose(2, 1, 0)
-        npy_array_transposed.tofile(raw_path)
-    return npy_array
+        npy_array_cropped_transposed = npy_array_cropped.transpose(2, 1, 0)
+        npy_array_cropped.tofile(raw_path)
+    return npy_array_cropped
     
 
 def crop_save_image(file_path, uncropped_shape=(272, 272, 176), 

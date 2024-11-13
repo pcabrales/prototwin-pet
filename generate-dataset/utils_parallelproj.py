@@ -44,6 +44,18 @@ def parallelproj_listmode_reconstruction(psf_path, img_shape=(248, 140, 176), vo
         depth = 20  #mm depth of crystal (depth is the max DOI if all photons are incident perpendicular to the crystal)
         mu = 0.082 # mm^-1 attenuation coefficient
         FWHM_detector= 3.39  # mm (given by detector side length, 2*pi*radius/num_sides)
+    elif scanner == 'quadra':
+        # Create a Quadra PET scanner
+        num_rings = 320
+        radius = 410.0  #mm
+        max_z = 530.0
+        num_sides = 760
+        # TOF
+        TOF_resolution = 225
+        psf = 3.5  # resolution of the scanner in mm        
+        depth = 20  #mm depth of crystal (depth is the max DOI if all photons are incident perpendicular to the crystal)
+        mu = 0.082 # mm^-1 attenuation coefficient
+        FWHM_detector= 3.39  # mm (given by detector side length, 2*pi*radius/num_sides)
     else:
         raise ValueError("Scanner not supported")
     

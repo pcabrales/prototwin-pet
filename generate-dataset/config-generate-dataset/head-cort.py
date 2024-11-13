@@ -22,10 +22,6 @@ matRad_output = loadmat(
     os.path.join(script_dir, f"../data/{patient_name}/matRad-output.mat")
 )
 uncropped_shape = [161, 161, 67]  # Uncropped CT shape
-cropped_shape = (161, 161, 67)  # Cropped CT including the body, removing empty areas
-xmin, ymin = 0, 0
-xmax, ymax = 161, 161
-Trans = (0, 0, 0)  # Offset in the cropped image to get the final image
 final_shape = [128, 128, 64]  # Final shape for the images, considering only where activity and dose are present (irradiated areas)
 voxel_size = np.array([3, 3, 5])  # in mm
 #
@@ -46,7 +42,7 @@ Espread = 0.006  # fractional energy spread (0.6%)
 target_dose = 2.18  # Gy  (corresponds to a standard 72 Gy, 33 fractions treatment)
 #
 # PET SIMULATION
-scanner = 'vision'  # only scanner implemented so far
+scanner = 'vision'  # Choose between "vision" and "quadra"
 mcgpu_location = os.path.join(script_dir, './pet-simulation-reconstruction/mcgpu-pet')
 mcgpu_input_location = os.path.join(mcgpu_location, f"MCGPU-PET-{scanner}.in")
 mcgpu_executable_location = os.path.join(mcgpu_location, 'MCGPU-PET.x')
