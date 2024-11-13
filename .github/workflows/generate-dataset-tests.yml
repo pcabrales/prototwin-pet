@@ -23,7 +23,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install pytest numpy
+        pip install pytest numpy matplotlib
 
     - name: Set PYTHONPATH
       run: echo "PYTHONPATH=$(pwd)/generate-dataset" >> $GITHUB_ENV
