@@ -658,10 +658,10 @@ for sobp_num in range(sobp_start, sobp_start + N_sobps):
         ax[3].imshow(CT_final[:, CT_final.shape[1] // 2, :].T, cmap="gray")
         # add CTV
         CTV_mask_path = os.path.join(dataset_folder, "CTV_mask.npy")
-        CTV_mask = crop_save_npy(
+        CTV_mask_cropped = crop_save_npy(
             CTV_mask, CTV_mask_path, raw_path=None, Trans=Trans, HL=final_shape // 2
         )
-        ax[3].imshow(CTV_mask[:, CTV_mask.shape[1] // 2, :].T, cmap="jet", alpha=0.5)
+        ax[3].imshow(CTV_mask_cropped[:, CTV_mask_cropped.shape[1] // 2, :].T, cmap="jet", alpha=0.5)
         ax[3].set_title("CT")
         plt.tight_layout()
         plt.savefig(os.path.join(dataset_folder, f"plot{sobp_num}.png"))
