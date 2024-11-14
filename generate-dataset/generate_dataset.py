@@ -214,11 +214,15 @@ with open(os.path.join(dataset_folder, "patient_info.txt"), "a") as patient_info
     patient_info_file.write(f"ymin: {ymin}, ymax: {ymax}\n")
     patient_info_file.write(f"zmin: {zmin}, zmax: {zmax}\n")
 cropped_shape = (
-    - xmin + xmax,
-    - ymin + ymax,
-    - zmin + zmax,
+    -xmin + xmax,
+    -ymin + ymax,
+    -zmin + zmax,
 )  # Cropped CT including the body, removing empty areas
-Trans = (0, 0, 0)  # Offset in the cropped image to get the final image (removed it for easier processing)
+Trans = (
+    0,
+    0,
+    0,
+)  # Offset in the cropped image to get the final image (removed it for easier processing)
 
 body_mask = body_mask[xmin:xmax, ymin:ymax, zmin:zmax]
 
@@ -318,7 +322,7 @@ else:
         mcgpu_input_location,
         sensitivity_location,
         hu2densities_path,
-        factor_activity=1.,
+        factor_activity=1.0,
     )
 
 # MCGPU-PET effective isotope mean lives (not half-lives)
@@ -528,7 +532,7 @@ for sobp_num in range(sobp_start, sobp_start + N_sobps):
                 activation_tissue[tissue_mask] *= field_factor_dict[isotope][tissue]
                 activation_tissue[~tissue_mask] = 0
                 activity_isotope_dict[isotope] += activation_tissue
-    
+
     # Scaling the dose to the target dose
     # this is done by matching the median dose in the CTV to the target dose (as found acceptable in https://doi.org/10.1186/s13014-022-02143-x)
     total_dose_CTV = total_dose[CTV_mask]
@@ -537,7 +541,6 @@ for sobp_num in range(sobp_start, sobp_start + N_sobps):
     for isotope in isotope_list:
         activity_isotope_dict[isotope] = activity_isotope_dict[isotope] * scaling_factor
         total_activity += activity_isotope_dict[isotope]
-    
 
     ## MCGPU-PET Simulation
     sobp_i_location = os.path.join(dataset_folder, sobp_folder_name)
@@ -661,7 +664,11 @@ for sobp_num in range(sobp_start, sobp_start + N_sobps):
         CTV_mask_cropped = crop_save_npy(
             CTV_mask, CTV_mask_path, raw_path=None, Trans=Trans, HL=final_shape // 2
         )
-        ax[3].imshow(CTV_mask_cropped[:, CTV_mask_cropped.shape[1] // 2, :].T, cmap="jet", alpha=0.5)
+        ax[3].imshow(
+            CTV_mask_cropped[:, CTV_mask_cropped.shape[1] // 2, :].T,
+            cmap="jet",
+            alpha=0.5,
+        )
         ax[3].set_title("CT")
         plt.tight_layout()
         plt.savefig(os.path.join(dataset_folder, f"plot{sobp_num}.png"))
