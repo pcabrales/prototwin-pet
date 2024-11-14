@@ -24,22 +24,16 @@ sys.path.append(script_dir)
 # USER-DEFINED PR0TOTWIN-PET PARAMETERS
 # ----------------------------------------------------------------------------------------------------------------------------------------
 #
-dataset_num = 2  # Dataset number to use
-seed = 42  # Set the seed for reproducibility
+seed = 42 # Set the seed for reproducibility
 patient_name = "head-cort"  # DEFINE THE PATIENT NAME
 model_name = f"{patient_name}-nnFormer-v1"  # DEFINE THE MODEL NAME
-dataset_dir = os.path.join(
-    script_dir, f"data/{patient_name}/dataset{dataset_num}"
-)  # DEFINE THE PET-DOSE DATASET LOCATION
+dataset_num = 1  # DEFINE THE DATASET NUMBER
+dataset_dir = os.path.join(script_dir, f"data/{patient_name}/dataset{dataset_num}")  # DEFINE THE PET-DOSE DATASET LOCATION
 mm_per_voxel = (3, 3, 5)
 img_size = (128, 128, 64)  # this is final_shape in generate_dataset/genetate_dataset.py
 train_fraction = 0.75  # Fraction of the dataset used for training
-val_fraction = (
-    0.13  # Fraction of the dataset used for validation (the rest is used for testing)
-)
-train_model_flag = (
-    True  # Set to True to train the model, False to only test an already trained model
-)
+val_fraction = 0.13  # Fraction of the dataset used for validation (the rest is used for testing)
+train_model_flag = False  # Set to True to train the model, False to only test an already trained model
 # -----------------------------------------------------------------------------------------------------------------------------------------
 
 set_seed(seed)
@@ -271,6 +265,29 @@ test(
     deviations=deviations,
     mm_per_voxel=mm_per_voxel,
 )
+# Tesing the baseline
+planned_dose = np.load(os.path.join(output_dir, "sobp0.npy"))
+planned_dose = torch.tensor(planned_dose, dtype=torch.float32).to(device).unsqueeze(0)
+planned_dose_batch = planned_dose.repeat(batch_size, 1, 1, 1, 1)
+results_dir = os.path.join(
+    script_dir, f"models/test-results/{model_name}-baseline-results.txt"
+)
+if deviations:
+    save_plot_dir = os.path.join(
+        script_dir, f"images/{model_name}-baseline-deviations-hist.jpg"
+    )
+    plot_type = "deviations"
+test(trained_model,
+     test_loader,
+     device,
+     results_dir=results_dir,
+     output_transform=output_transform,
+     save_plot_dir=save_plot_dir,
+     plot_type=plot_type,
+     deviations=deviations,
+     mm_per_voxel=mm_per_voxel,
+     baseline=True,
+     planned_dose=planned_dose_batch)
 
 
 # # Save the model complexity, comment out if running out of GPU memory

@@ -113,7 +113,7 @@ python main.py
 - model_sizes.txt: File containing the sizes of the models in terms of parameters and FLOPs
 - trained-models: Folder containing trained models (no trained models included in the repository due to size)
 - losses: Folder containing the losses of the models during training as csv files
-- test-results: Folder containing test metrics (MSE, Gamma Index, Gamma Value, PSNR, Set-Up prediction absolute error) for each model in txt files
+- test-results: Folder containing test metrics (MSE, Gamma Index, Gamma Value, PSNR, Set-Up prediction absolute error) for each model and the baseline (actual delivered vs planned dose) in txt files
 - training-times: Folder containing txt files with the training duration
 
 ## Testing, training, utility, and main scripts 🏋️‍♂️

@@ -1,0 +1,15 @@
+##############################################
+Results (Actual vs Planned Delivered Dose):
+##############################################
+L2 Loss (Gy²): 0.008801 +- 0.005077
+Mean Relative Error (%): 3.5554 +- 1.2907
+Peak Signal-to-Noise Ratio: 31.4834 +- 2.6372
+Pymed gamma value (1mm, 1%): 1.2345 +- 1.1805
+Pymed gamma index (1mm, 1%): 0.5473 +- 0.1552
+Pymed gamma value (3mm, 3%): 0.4268 +- 0.3837
+Pymed gamma index (3mm, 3%): 0.9124 +- 0.0801
+Fraction of gamma values below 0.9: 0.3750
+Time per loading (ms): 0.1298 +- 0.0268
+x deviation error (mm), maximum deviation is +- 5mm: 2.2307 +- 1.3478
+y deviation error (mm), maximum deviation is +- 5mm: 2.6230 +- 1.4338
+Mean deviation error psi (degrees), maximum deviation is +- 5º: 2.1644 +- 1.5438

@@ -25,23 +25,10 @@ def test(
     plot_type="gamma",
     deviations=False,
     mm_per_voxel=(1.9531, 1.9531, 1.5),
+    baseline=False,  # If True, will test the baseline scenario (actual delivered dose compared to treatment plan dose)
+    planned_dose=None,
 ):
     # plot_type can be "gamma" or "deviations", will plot the histogram of these values in the test set
-
-    ###
-
-    # dataset_folder = output_dir
-    # folders = [f for f in os.listdir(dataset_folder) if os.path.isfile(os.path.join(dataset_folder, f))]
-    # N_sobps = len(folders)
-    # print(N_sobps)
-
-    # sobp_0_np = np.load(os.path.join(dataset_folder, "sobp0.npy"))
-    # sobp_0 = torch.tensor(sobp_0_np, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
-    # for i in range(N_sobps - 1):
-    #     print("Processing SOBP ", i)
-    #     sobp_i = np.load(os.path.join(dataset_folder, f"sobp{i+1}.npy"))
-    ###
-
     # Test loop (after the training is complete)
     time_list = []
     l2_loss_list = []
@@ -69,11 +56,14 @@ def test(
             batch_input = batch_input.to(device)
             start_time = time.time()
             if deviations:
-                batch_output, deviations_output = trained_model(
-                    batch_input, return_bottleneck=True
-                )
+                if baseline:
+                    batch_output = planned_dose.clone()
+                    deviations_output = torch.zeros_like(deviations_target)
+                else:
+                    batch_output, deviations_output = trained_model(
+                        batch_input, return_bottleneck=True
+                    )
                 deviations_output = deviations_output.detach().cpu()
-                print(deviations_output, deviations_target)
                 x_deviation_error_list.append(
                     torch.abs(deviations_output[:, 0] - deviations_target[:, 0])
                 )
@@ -88,10 +78,14 @@ def test(
                 psi_deviation_list.append(torch.abs(deviations_target[:, 2]))
 
             else:
-                batch_output = trained_model(batch_input)  # generating images
+                if baseline:
+                    batch_output = planned_dose.clone()
+                else:
+                    batch_output = trained_model(batch_input)  # generating images
             time_list.append((time.time() - start_time) * 1000)
             if output_transform is not None:
-                batch_output = output_transform.inverse(batch_output)
+                if not baseline:
+                    batch_output = output_transform.inverse(batch_output)
                 batch_target = output_transform.inverse(batch_target)
             batch_output = batch_output.detach().cpu()
             torch.cuda.empty_cache()
@@ -154,16 +148,24 @@ def test(
     )
     psnr_list = torch.cat(psnr_list)
 
+    if baseline:
+        first_line = "Results (Actual vs Planned Delivered Dose):\n"
+    else:
+        first_line = "Results (Actual vs Estimated Delivered Dose):\n"
+        
     text_results = (
-        f"L2 Loss (Gy²): {torch.mean(l2_loss_list)} +- {torch.std(l2_loss_list)}\n"
-        f"Mean Relative Error (%): {torch.mean(mre_loss_list)} +- {torch.std(mre_loss_list)}\n"
-        f"Peak Signal-to-Noise Ratio: {torch.mean(psnr_list)} +- {torch.std(psnr_list)}\n"
-        f"Pymed gamma value (1mm, 1%): {torch.mean(gamma_value_pymed_list_1)} +- {torch.std(gamma_value_pymed_list_1)}\n"
-        f"Pymed gamma index (1mm, 1%): {torch.mean(gamma_pymed_list_1)} +- {torch.std(gamma_pymed_list_1)}\n"
-        f"Pymed gamma value (3mm, 3%): {torch.mean(gamma_value_pymed_list_3)} +- {torch.std(gamma_value_pymed_list_3)}\n"
-        f"Pymed gamma index (3mm, 3%): {torch.mean(gamma_pymed_list_3)} +- {torch.std(gamma_pymed_list_3)}\n"
-        f"Fraction of gamma values below 0.9: {fraction_below_90}\n\n"
-        f"Time per loading (ms): {np.mean(np.array(time_list))} +- {np.std(np.array(time_list))}"
+        "##############################################\n" +
+        first_line +
+        "##############################################\n" +
+        f"L2 Loss (Gy²): {torch.mean(l2_loss_list):.6f} +- {torch.std(l2_loss_list):.6f}\n"
+        f"Mean Relative Error (%): {torch.mean(mre_loss_list):.4f} +- {torch.std(mre_loss_list):.4f}\n"
+        f"Peak Signal-to-Noise Ratio: {torch.mean(psnr_list):.4f} +- {torch.std(psnr_list):.4f}\n"
+        f"Pymed gamma value (1mm, 1%): {torch.mean(gamma_value_pymed_list_1):.4f} +- {torch.std(gamma_value_pymed_list_1):.4f}\n"
+        f"Pymed gamma index (1mm, 1%): {torch.mean(gamma_pymed_list_1):.4f} +- {torch.std(gamma_pymed_list_1):.4f}\n"
+        f"Pymed gamma value (3mm, 3%): {torch.mean(gamma_value_pymed_list_3):.4f} +- {torch.std(gamma_value_pymed_list_3):.4f}\n"
+        f"Pymed gamma index (3mm, 3%): {torch.mean(gamma_pymed_list_3):.4f} +- {torch.std(gamma_pymed_list_3):.4f}\n"
+        f"Fraction of gamma values below 0.9: {fraction_below_90:.4f}\n"
+        f"Time per loading (ms): {np.mean(np.array(time_list)):.4f} +- {np.std(np.array(time_list)):.4f}"
     )
 
     if deviations:
@@ -174,9 +176,9 @@ def test(
         y_deviation_list = torch.cat(y_deviation_list)
         psi_deviation_list = torch.cat(psi_deviation_list)
         text_results += (
-            f"\n\n x deviation error (mm), maximum deviation is +- 5mm: {torch.mean(x_deviation_error_list)} +- {torch.std(x_deviation_error_list)}\n"
-            f"y deviation error (mm), maximum deviation is +- 5mm: {torch.mean(y_deviation_error_list)} +- {torch.std(y_deviation_error_list)}\n"
-            f"Mean deviation error psi (degrees), maximum deviation is +- 5º: {torch.mean(psi_deviation_error_list)} +- {torch.std(psi_deviation_error_list)}\n"
+            f"\nx deviation error (mm), maximum deviation is +- 5mm: {torch.mean(x_deviation_error_list):.4f} +- {torch.std(x_deviation_error_list):.4f}\n"
+            f"y deviation error (mm), maximum deviation is +- 5mm: {torch.mean(y_deviation_error_list):.4f} +- {torch.std(y_deviation_error_list):.4f}\n"
+            f"Mean deviation error psi (degrees), maximum deviation is +- 5º: {torch.mean(psi_deviation_error_list):.4f} +- {torch.std(psi_deviation_error_list):.4f}\n"
         )
 
     print(text_results)
@@ -227,25 +229,30 @@ def test(
                 [x_deviation_list, y_deviation_list, psi_deviation_list]
             )
             # Plot the histogram of gamma indices
-            bin_width = 0.6
             font_size = 28
             plt.figure(figsize=(10, 6))  # Plot first list
-            plt.xticks([0.00, 0.05, 0.10, 0.15, 0.20], fontsize=font_size)
             plt.yticks(fontsize=font_size)
             # sns.histplot(all_deviations.cpu().numpy().flatten(), color="red", alpha=0.6, label='|Actual Positioning Deviations|',
             #     binwidth=bin_width, edgecolor='black'
             # )
-            bin_width = 0.05
+            if baseline:
+                label_histplot = "|Actual - Planned Setup Deviations|"
+                bin_width = 0.6
+                plt.xticks([0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0], fontsize=font_size)
+            else:
+                label_histplot =  "|Actual - Estimated Setup Deviations|"
+                plt.xticks([0.00, 0.05, 0.10, 0.15, 0.20], fontsize=font_size)
+                bin_width = 0.05
             sns.histplot(
                 all_deviations_error.cpu().numpy().flatten(),
                 color="blue",
                 alpha=0.7,
-                label="|Estimated - Actual Set-Up Deviations|",
+                label=label_histplot,
                 binwidth=bin_width,
                 edgecolor="black",
             )
             plt.ylabel("Counts", fontsize=font_size)
-            plt.xlabel("Set-up Deviations (º or mm)", fontsize=font_size)
+            plt.xlabel("Setup Deviations (º or mm)", fontsize=font_size)
             plt.legend(fontsize=font_size - 2)
             plt.tight_layout()
             if save_plot_dir is not None:
