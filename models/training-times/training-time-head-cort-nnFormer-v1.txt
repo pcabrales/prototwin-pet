@@ -1,1 +1,1 @@
-epoch 4 batch 36
+Training time: 6.630623817443848 seconds. Best epoch: 4

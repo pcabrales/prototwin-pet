@@ -15,7 +15,8 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 from matplotlib import font_manager
-font_path = '/usr/share/fonts/truetype/msttcorefonts/Times_New_Roman.ttf'
+script_dir = os.path.dirname(os.path.abspath(__file__))
+font_path = os.path.join(script_dir, 'images/Times_New_Roman.ttf')
 font_manager.fontManager.addfont(font_path)
 import pymedphys
 from collections import Counter

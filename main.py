@@ -24,9 +24,9 @@ model_name = f"{patient_name}-nnFormer-v1"  # DEFINE THE MODEL NAME
 dataset_dir = os.path.join(script_dir, f"data/{patient_name}/dataset{dataset_num}")  # DEFINE THE PET-DOSE DATASET LOCATION
 mm_per_voxel = (3, 3, 5)
 img_size = (128, 128, 64)  # this is final_shape in generate_dataset/genetate_dataset.py
-train_fraction = 0.75  # Fraction of the dataset used for training
-val_fraction = 0.13  # Fraction of the dataset used for validation (the rest is used for testing)
-train_model_flag = True  # Set to True to train the model, False to only test an already trained model
+train_fraction = 0.3  # Fraction of the dataset used for training
+val_fraction = 0.3  # Fraction of the dataset used for validation (the rest is used for testing)
+train_model_flag = False  # Set to True to train the model, False to only test an already trained model
 # -----------------------------------------------------------------------------------------------------------------------------------------
 
 set_seed(seed)
@@ -120,7 +120,7 @@ model = nnFormer(crop_size=img_size,
 model_dir = os.path.join(script_dir, f'models/trained-models/{model_name}.pth')
 timing_dir = os.path.join(script_dir, f'models/training-times/training-time-{model_name}.txt')
 losses_dir = os.path.join(script_dir, f'models/losses/{model_name}-loss.csv')
-n_epochs = 600
+n_epochs = 5
 patience += 50
 accumulation_steps = 4 // batch_size  # number of batches before taking an optimizer step, trying to stabilize trainng for batch_size=1 used for the head dataset
 save_plot_dir = os.path.join(script_dir, f"images/{model_name}-loss.jpg")
