@@ -25,7 +25,7 @@
 #[SECTION PHASE SPACE FILE v.2016-07-05] BIOGRAPH VISON Quadra PET/CT System SCANNER 
  MCGPU_PET.psf                  # OUTPUT PHASE SPACE FILE FILE NAME
  0.0  0.0  0.0  25.6  -41.0    # CYLINDRIC DETECTOR CENTER, HEIGHT, AND RADIUS: X, Y, Z, H, RADIUS [cm] (IF RADIUS<0: DETECTOR CENTERED AT THE CENTER OF THE VOXELIZED GEOMETRY)
- 40000000                      # PHASE SPACE FILE SIZE (MAXIMUM NUMBER OF ELEMENTS)
+ 200000000                      # PHASE SPACE FILE SIZE (MAXIMUM NUMBER OF ELEMENTS)
  1                              # REPORT TRUES (1), SCATTER (2), OR BOTH (0)
  1                              # REPORT PSF (1), SINOGRAM (2) or BOTH (0) 
 
@@ -50,12 +50,12 @@ mc-gpu_dose.dat                 # OUTPUT VOXEL DOSE FILE NAME
 80     # NUMBER OF ROWS 
 760    # TOTAL NUMBER OF CRYSTALS
 380    # NUMBER OF ANGULAR BINS (NCRYSTALS/2)
-759    # NUMBER OF RADIAL BINS // 391
+759    # NUMBER OF RADIAL BINS (NCRYSTALS-1)
 159    # NUMBER OF Z SLICES 2 * NUMBER OF ROWS - 1;  ADJUSTING FOR PARALLELPROJ
-250    # IMAGE RESOLUTION (NUMBER OF BINS IN THE IMAGE) (radius/resolution?) solo afecta image_Trues.raw
-70     # NUMBER OF ENERGY BINS (NE)
-85     # MAXIMUM RING DIFFERENCE (MRD)
-11      # SPAN
+3    # IMAGE RESOLUTION (NUMBER OF BINS IN THE IMAGE) (radius/resolution?) solo afecta image_Trues.raw
+75      # NUMBER OF ENERGY BINS (NE)
+79     # MAXIMUM RING DIFFERENCE (MRD)   # Putting the maximum number (79) because it improves sensitivity image and for list (not sinogram) it does not matter
+79     # SPAN, USING PARALLELPROJ VALUE  # Putting the maximum number (79) because it improves sensitivity image and for list (not sinogram) it does not matter
 
 
 #[SECTION VOXELIZED GEOMETRY FILE v.2009-11-30]

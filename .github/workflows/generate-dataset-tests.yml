@@ -1,0 +1,33 @@
+name: Running unit tests for generate-dataset
+
+on: [push, pull_request]
+
+jobs:
+  test:
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python-version: [3.11]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pytest numpy matplotlib
+
+    - name: Set PYTHONPATH
+      run: echo "PYTHONPATH=$(pwd)/generate-dataset" >> $GITHUB_ENV
+
+    - name: Run tests
+      run: |
+        pytest unit-tests/generate-dataset/tests.py

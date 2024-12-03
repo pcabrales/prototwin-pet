@@ -1,10 +1,13 @@
 data/*
+!data/ipot-hu2materials.txt
 !data/head-cort/
 data/head-cort/*
 !data/head-cort/sensitivity.npy
-models/trained-models
+models/trained-models/*
+!models/trained-models/.gitkeep
 generate-dataset/pet-simulation-reconstruction/mcgpu-pet/*
 !generate-dataset/pet-simulation-reconstruction/mcgpu-pet/MCGPU-PET-vision.in
+!generate-dataset/pet-simulation-reconstruction/mcgpu-pet/MCGPU-PET-quadra.in
 !generate-dataset/pet-simulation-reconstruction/mcgpu-pet/materials
 positron-range-correction
 *Zone.Identifier
