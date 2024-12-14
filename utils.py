@@ -1037,16 +1037,10 @@ def plot_slices(
         if original_dose is not None:
             original_dose = original_dose / np.max(original_dose) * max_dose
 
-    # To Bq
+    # To kBq/cc
     input_scaled = (
         input_scaled / torch.max(input_scaled) * max_activity
-    )  ### found with the equation for A(to): ###
-    # TO GET ACTIVITY IN Bq
-    # print("Activity factor (multiply by max of activation image for each isotope and by sensitivity of the scanner (0.05) and add them up to geit initial activity in Bq to scale the activation image)")
-    # print('C11: ', lambda_dict['C10'] / 60 * np.exp(-lambda_dict['C10'] * initial_time))
-    # print('N13: ', lambda_dict['N13'] / 60 * np.exp(-lambda_dict['N13'] * initial_time))
-    # print('O15: ', lambda_dict['O15'] / 60 * np.exp(-lambda_dict['O15'] * initial_time))
-    # print('C10: ', lambda_dict['C10'] / 60 * np.exp(-lambda_dict['C10'] * initial_time))
+    )
 
     norm = mcolors.Normalize(vmin=0, vmax=max_dose * 0.6)
     norm_act = mcolors.Normalize(
@@ -1189,7 +1183,7 @@ def plot_slices(
                     vmin=vmin_CT,
                     vmax=vmax_CT,
                     alpha=0.99,
-                )  ### vmin and vmax modified to see PET
+                )  # vmin and vmax modified to see PET
 
         else:
             mask_input = np.ones_like(input_img).astype(
@@ -1216,7 +1210,7 @@ def plot_slices(
             aspect="auto",
             alpha=mask_input,
             norm=norm_act,
-        )  ### BuPu is another option for the colormap
+        )  # BuPu is another option for the colormap
         axs[idx, 0].set_xticks([])
         axs[idx, 0].set_yticks([])
         # if idx == 0:
@@ -1370,13 +1364,11 @@ def plot_sample(
         )
         planned_dose = planned_dose / np.max(planned_dose) * max_dose
 
-    # To Bq
+    # To kBq
     PET_scaled = (
         PET_scaled / torch.max(PET_scaled) * max_activity
-    )  ### found with the equation for A(to):
-    # TO GET ACTIVITY IN Bq
-    # print("Activity factor (multiply by max of activation image for each isotope and by sensitivity of the scanner (0.05) and add them up to geit initial activity in Bq to scale the activation image)")
-    # print('C11: ', lambda_dict['C10'] / 60 * np.exp(-lambda_dict['C10'] * initial_time))
+    )
+    
     norm = mcolors.Normalize(vmin=0, vmax=max_dose * 0.6)
     norm_act = mcolors.Normalize(
         vmin=max_activity * 0.01, vmax=max_activity * 0.5
@@ -1613,12 +1605,12 @@ def plot_sample(
         aspect="auto",
         alpha=mask_PET,
         norm=norm_act,
-    )  ### BuPu is another option for the colormap
+    )  # BuPu is another option for the colormap
     axs[3].set_xticks([])
     axs[3].set_yticks([])
     cbar_ax_pet = fig.add_axes([0.51, 0.0, 0.15, 0.07])
     cbar_pet = fig.colorbar(c_pet, cax=cbar_ax_pet, orientation="horizontal")
-    cbar_pet.set_label(label=r"Activity (Bq/cc)", size=font_size)
+    cbar_pet.set_label(label=r"Activity (kBq/cc)", size=font_size)
     cbar_pet.ax.tick_params(labelsize=font_size)
 
     c_estimated = axs[4].imshow(
@@ -2750,7 +2742,7 @@ def compare_plan_pet(
     # Add vertical colorbar to the left of the figure
     cbar_ax = fig.add_axes([0.065, 0.16, 0.02, 0.68])
     cbar = fig.colorbar(c0, cax=cbar_ax, orientation="vertical")
-    cbar.ax.set_title("Bq/cc", fontsize=font_size)
+    cbar.ax.set_title("kBq/cc", fontsize=font_size)
     cbar.ax.tick_params(labelsize=font_size)
     cbar.ax.yaxis.tick_left()
     cbar.ax.yaxis.set_ticks_position("left")

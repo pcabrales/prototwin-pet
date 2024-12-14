@@ -535,6 +535,10 @@ for sobp_num in range(sobp_start, sobp_start + N_sobps):
     for isotope in isotope_list:
         activity_isotope_dict[isotope] = activity_isotope_dict[isotope] * scaling_factor
         total_activity += activity_isotope_dict[isotope]
+    
+    # Get the maximum activity /cc
+    max_activity = np.max(total_activity) / np.prod(voxel_size / 10)
+    print(f"Maximum activity: {max_activity}")
 
     ## MCGPU-PET Simulation
     sobp_i_location = os.path.join(dataset_folder, sobp_folder_name)

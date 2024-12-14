@@ -223,7 +223,7 @@ threshold = 0.1  # %
 tolerance = 3  # %
 distance_mm_threshold = 3  # mm
 max_dose = 2.18  # Gy
-max_activity = 29.33  #  Bcq/cc para escalar la actividad antes y despues de mcgpu, simplemente dividir actividad por las activaciones totales obtenidas y multiplicar por las activaciones totales de image_Trues.raw? dividir por 1800 para obtener una actividad media?: lo que he hecho es tomar el número de activaciones maximas en un voxel de image_Trues (302) dividirlo entre los segundos de adquisicion (1800), para tener una actividad media, dividir por 1.9531*1.953*1.5 (volumen del voxel en mm^3) y multiplicar por mil (mm^3 a cc) = 29.33 Bcq/cc máximo que usamos para los plots
+max_activity = 0.78  #  kBq/cc (taking it from the simulation, in generate_dataset.py)
 save_plot_dir = os.path.join(script_dir, f"images/{model_name}-single-sample.jpg")
 plot_sample(
     trained_model,
