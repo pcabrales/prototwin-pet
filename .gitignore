@@ -3,6 +3,7 @@ data/*
 !data/head-cort/
 data/head-cort/*
 !data/head-cort/sensitivity.npy
+!data/head-cort/matRad-output.mat
 models/trained-models/*
 !models/trained-models/.gitkeep
 generate-dataset/pet-simulation-reconstruction/mcgpu-pet/*
