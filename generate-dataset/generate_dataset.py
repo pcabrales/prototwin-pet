@@ -33,15 +33,12 @@ dev = xp.cuda.Device(0)
 dataset_num = 1
 seed_number = 42
 patient_name = 'head-cort'
-patient_folder = os.path.join(
-    script_dir, f"../data/{patient_name}"
-)  # Folder to save the numpy arrays for model training
 dataset_folder = os.path.join(
-    patient_folder, f"dataset{dataset_num}"
+    script_dir, f"../data/{patient_name}/dataset{dataset_num}"
 )  # Folder to save the numpy arrays for model training
 # Path to the DICOM directory (only if necessary, currently the CT can be loaded from matRad-output.mat)
-dicom_dir = None  # os.path.join(patient_folder, 'data/CT')
-mhd_file = os.path.join(patient_folder, "CT.mhd")  # mhd file with the CT
+dicom_dir = None  # os.path.join(dataset_folder, 'CT')
+mhd_file = os.path.join(dataset_folder, "CT.mhd")  # mhd file with the CT
 # Load matRad treatment plan parameters (CURRENTLY ONLY SUPPORTS MATRAD OUTPUT)
 matRad_output = loadmat(
     os.path.join(script_dir, f"../data/{patient_name}/matRad-output.mat")
@@ -201,8 +198,17 @@ body_mask[body_coords] = True
 # Get a maximal crop of the body for sensitivity calculation
 indices = np.where(body_mask)
 xmin, xmax = np.min(indices[0]), np.max(indices[0])
+if xmax - xmin < final_shape[0]:
+    xmin = max(0, xmin - (final_shape[0] - (xmax - xmin)) // 2)
+    xmax = xmin + final_shape[0]
 ymin, ymax = np.min(indices[1]), np.max(indices[1])
+if ymax - ymin < final_shape[1]:
+    ymin = max(0, ymin - (final_shape[1] - (ymax - ymin)) // 2)
+    ymax = ymin + final_shape[1]
 zmin, zmax = np.min(indices[2]), np.max(indices[2])
+if zmax - zmin < final_shape[2]:
+    zmin = max(0, zmin - (final_shape[2] - (zmax - zmin)) // 2)
+    zmax = zmin + final_shape[2]
 with open(os.path.join(dataset_folder, "patient_info.txt"), "a") as patient_info_file:
     patient_info_file.write(f"xmin: {xmin}, xmax: {xmax}\n")
     patient_info_file.write(f"ymin: {ymin}, ymax: {ymax}\n")
@@ -279,7 +285,7 @@ os.environ["PYTHONHASHSEED"] = str(seed_number)
 save_raw = False
 
 # Cropping the CT
-CT_file_path = os.path.join(patient_folder, "CT.raw")
+CT_file_path = os.path.join(dataset_folder, "CT.raw")
 # CT_cropped HAS THE SHAPE OF THE CT CROPPED TO INCLUDE THE ENTIRE BODY, BUT THE FINAL CT USED
 # FOR THE SIMULATION IS CROPPED TO THE FINAL SHAPE, ONLY INCLUDING THE AREAS WHERE ACTIVITY AND DOSE ARE PRESENT
 # SO THE CT SAVED AT CT_npy_path IS MORE CROPPED THAN CT_cropped however ironic it is

@@ -7,15 +7,12 @@
 dataset_num = 2
 seed_number = 42
 patient_name = "HN-CHUM-018"
-patient_folder = os.path.join(
-    script_dir, f"../data/{patient_name}"
-)  # Folder to save the numpy arrays for model training
 dataset_folder = os.path.join(
-    patient_folder, f"dataset{dataset_num}"
+    script_dir, f"../data/{patient_name}/dataset{dataset_num}"
 )  # Folder to save the numpy arrays for model training
 # Path to the DICOM directory (only if necessary, currently the CT can be loaded from matRad-output.mat)
-dicom_dir = None  # os.path.join(patient_folder, 'data/CT')
-mhd_file = os.path.join(patient_folder, "CT.mhd")  # mhd file with the CT
+dicom_dir = None  # os.path.join(dataset_folder, 'CT')
+mhd_file = os.path.join(dataset_folder, "CT.mhd")  # mhd file with the CT
 # Load matRad treatment plan parameters (CURRENTLY ONLY SUPPORTS MATRAD OUTPUT)
 matRad_output = loadmat(
     os.path.join(script_dir, f"../data/{patient_name}/matRad-output.mat")
