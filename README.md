@@ -32,10 +32,6 @@ conda activate prototwin-pet
 
 You will also need:
 - CUDA Toolkit 12.3 or higher. It may work with lower versions, but it has only been tested with 12.3 and 12.4.
-- matRad software:
-    - The code currently works only with MatRad treatment planning
-    - Install from the [official site](https://e0404.github.io/matRad/)
-- To use a patient's data not already included in MatRad, include a dataset with CTs and OAR and target tumor volumes RTSTRUCTs
 - FRED Monte Carlo GPU v 3.70.0:
     - Install from the [official site](https://www.fred-mc.org/Manual_3.70/Download/Latest%20release.html#latestrelease)
 - Code for Positron Range Correction (Híbrido, Paula Ibañez, UCM - Not included in the repository, not open-source yet)
@@ -50,30 +46,32 @@ You will also need:
     - If your CUDA does not include the `samples` folder, you will need to download the [cuda-samples repository](https://github.com/NVIDIA/cuda-samples.git) and place it in the `CUDA` directory. Then, in the `Makefile`, change the `CUDA_SDK_PATH` to `/path/to/cuda-samples/Common/`.
     - Install as instructed in the `README.md` and place the `MCGPU-PET.x` executable in `/generate-dataset/pet-simulation-reconstruction/mcgpu-pet/`
     - The input files `MCGPU-PET-vision.in` and `MCGPU-PET-quadra.in` already included in `/generate-dataset/pet-simulation-reconstruction/mcgpu-pet`
-
 After installing the necessary software, restart the terminal or update the environment variables:
 ```bash
 source ~/.bashrc
 ```
+Optionally:
+- Install [MatRad](https://e0404.github.io/matRad/) for treatment planning of different patients.
+
 
 ## Usage 🚀
 
-### Step 0: Select a Patient 🧑‍⚕️
+### Step 1: Select a Patient and Plan Treatment (if Necessary) 🧑‍⚕️
 
-#### Option A (for testing purposes): Use the Head and Neck Data Provided by MatRad from the [CORT](https://academic.oup.com/gigascience/article/3/1/2047-217X-3-37/2682969) Dataset
-- You only need to load `HEAD_AND_NECK.mat` in MatRad, which is included in the `phantoms` folder of the `matRad-master`.
+#### Option A (for testing purposes): Use the Head and Neck Data from the [CORT](https://academic.oup.com/gigascience/article/3/1/2047-217X-3-37/2682969) Dataset
+
+The `data/head-cort` folder already includes the treatment plan struct (`matRad-output.mat`) necessary to generate the dataset.
 
 #### Option B: Use External Data 
-The data should contain the CT and RTSTRUCTs with the OAR and target tumor volumes in DICOM format.
-In our study, we selected patient HN-CHUM-018 from the [Head-Neck-PET-CT dataset](https://www.cancerimagingarchive.net/collection/head-neck-pet-ct/), which is available to the public but requires registration and approval.
--  `INFOclinical_HN_Version2_30may2018.xlsx` file is used to select the patient.
-- `metadata.csv` to find the CT and RTSTRUCT files.
-- In a single folder, place the CT (`dcm` files for each axial slice) and RTSTRUCTs (single `dcm` file) for MatRad processing.
-- Run `matRadGUI` in MATLAB and click "Load DICOM" in the Workflow box (top left). Select the directory by clicking on the patient ID.
-- Save the .mat file by clicking "Import". Save it to `/path/to/matRad-master/phantoms/HN-CHUM-018.mat`.
-
-### Step 1: MatRad for Treatment Planning 🎛️
-After installing matRad, copy the provided `generate_dataset/matRad_head_protons_prototwin_pet.m` file to the MatRad base directory and run it. This is basically the same example as provided in the `/matRad/examples/matRad_example5_protons.m` script, which you can find directly [here](https://github.com/e0404/matRad/blob/master/examples/matRad_example5_protons.m), but with the code to save the output parameters for the Monte Carlo simulation and the optimization angles for the patient.
+- If you want to use external patient data and plan the treatment, you will need to install [MatRad](https://e0404.github.io/matRad/), as the code currently works with the output of the MatRad treatment planning software. 
+- You should include a datset containing the CT and RTSTRUCTs with the OAR and target tumor volumes in DICOM format.
+- In our study, we selected patient HN-CHUM-018 from the [Head-Neck-PET-CT dataset](https://www.cancerimagingarchive.net/collection/head-neck-pet-ct/), which is available to the public but requires registration and approval.
+    -  `INFOclinical_HN_Version2_30may2018.xlsx` file is used to select the patient.
+    - `metadata.csv` to find the CT and RTSTRUCT files.
+    - In a single folder, place the CT (`dcm` files for each axial slice) and RTSTRUCTs (single `dcm` file) for MatRad processing.
+    - Run `matRadGUI` in MATLAB and click "Load DICOM" in the Workflow box (top left). Select the directory by clicking on the patient ID.
+    - Save the .mat file by clicking "Import". Save it to `/path/to/matRad-master/phantoms/HN-CHUM-018.mat`.
+    - Copy the provided `generate_dataset/matRad_head_protons_prototwin_pet.m` file to the MatRad base directory and run it. This is adapted from the `/matRad/examples/matRad_example5_protons.m` script, found [here](https://github.com/e0404/matRad/blob/master/examples/matRad_example5_protons.m).
 
 ### Step 2: Generate Dataset 🛠️
 Run the dataset generation script, changing the `USER-DEFINED PR0TOTWIN-PET PARAMETERS` inside the script as needed:
@@ -127,7 +125,7 @@ python main.py
 
 ## Dataset Generation 🛠️
 - generate_dataset.py: Script to generate the dataset for the deep learning model
-- config-generate-dataset: Contains`.py` config files with the initialization parameters for each patient's dataset generation 
+- config-generate-dataset: Contains`.py` config files with the initialization parameters (`USER-DEFINED PR0TOTWIN-PET PARAMETERS`) for each patient's dataset generation 
 - timings: Folder containing the timings for each part of the dataset generation*ipot* stands for ionization potential of the material
 - original-fred.inp: Original FRED input file to be modified for the simulation
 - utils.py, utils_parallelproj.py: Utility functions for the dataset generation  
@@ -139,7 +137,7 @@ python main.py
         - MCGPU-PET.x: Executable for the MCGPU-PET simulation. **NOT INCLUDED IN THE REPOSITORY, COMPILE FOR EACH DEVICE AS INSTRUCTED EARLIER**
 
 ## Config Files 📝
-- config-main: Contains`.py` config files with the initialization parameters for each patient's deep learning model training and testing.
+- config-main: Contains`.py` config files with the initialization parameters (`USER-DEFINED PR0TOTWIN-PET PARAMETERS`) for each patient's deep learning model training and testing.
 
 ## License 📄
 This project is under a GNU General Public License v3.0.
