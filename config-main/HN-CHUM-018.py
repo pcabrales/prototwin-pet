@@ -11,5 +11,5 @@ mm_per_voxel = (1.9531, 1.9531, 1.5)  # Image resolution, for head
 img_size = (128, 96, 128)  # For head   # this is final_shape in generate_dataset/genetate_dataset.py
 train_fraction = 0.75  # Fraction of the dataset used for training
 val_fraction = 0.13  # Fraction of the dataset used for validation (the rest is used for testing)
-train_model_flag = False  # Set to True to train the model, False to only test an already trained model
+train_model_flag = True  # Set to True to train the model, False to only test an already trained model
 # -----------------------------------------------------------------------------------------------------------------------------------------

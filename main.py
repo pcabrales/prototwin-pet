@@ -33,7 +33,7 @@ mm_per_voxel = (3, 3, 5)
 img_size = (128, 128, 64)  # this is final_shape in generate_dataset/genetate_dataset.py
 train_fraction = 0.75  # Fraction of the dataset used for training
 val_fraction = 0.13  # Fraction of the dataset used for validation (the rest is used for testing)
-train_model_flag = False  # Set to True to train the model, False to only test an already trained model
+train_model_flag = True  # Set to True to train the model, False to only test an already trained model
 # -----------------------------------------------------------------------------------------------------------------------------------------
 
 set_seed(seed)

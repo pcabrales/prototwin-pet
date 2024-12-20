@@ -11,5 +11,5 @@ mm_per_voxel = (1, 2, 2)  # for prostate
 img_size = (160, 32, 32)  # For prostate  # this is final_shape in generate_dataset/genetate_dataset.py
 train_fraction = 0.75  # Fraction of the dataset used for training
 val_fraction = 0.13  # Fraction of the dataset used for validation (the rest is used for testing)
-train_model_flag = False  # Set to True to train the model, False to only test an already trained model
+train_model_flag = True  # Set to True to train the model, False to only test an already trained model
 # -----------------------------------------------------------------------------------------------------------------------------------------
