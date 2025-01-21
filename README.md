@@ -2,7 +2,7 @@
 
 ![](./images/head-sobp-nnFormer-v17-single-sample.jpg)
 
-PROTOTWIN-PET is part of the PROTOTWIN project, which aims to develop dose verification methods for proton therapy using PET imaging. A link to the article will be provided once it is published.
+[![Published Paper](https://img.shields.io/badge/Paper-Published-green)](https://ieeexplore.ieee.org/document/10847605)
 
 This repository was developed by Pablo Cabrales, PhD candidate at the Nuclear Physics Group, Complutense University of Madrid. Please e-mail [pcabrale@ucm.es](mailto:pcabrale@ucm.es) for any enquiries.
 
@@ -14,7 +14,13 @@ PROTOTWIN-PET (PROTOn therapy digital TWIN models for dose verification with PET
 
 The workflow starts with the treatment plan obtained from the patient’s CT scan one day before the first treatment session. Next, the dose verification approach (in-beam or off-line) is defined. Using the GPU Monte Carlo simulation tool Fred, deviations in the treatment plan that may occur in the clinical practice are simulated, producing pairs of positron emission and dose maps for each treatment deviation, or digital twin, of the patient. The positron emission maps are then converted to PET using GPU-based PET simulation and reconstruction tools, including a tissue-specific model for washout and positron range, scanner resolution, and Depth-Of-Interaction (DOI) effects.
 
-The resulting dataset of PET-dose pairs is used to train a state-of-the-art, efficient 3D deep learning model with a Deviation Predicting Branch (DPB) to predict dose maps and patient set-up errors from PET scans within milliseconds after a proton therapy treatment.
+The resulting dataset of PET-dose pairs is used to train a state-of-the-art 3D deep learning model with a Deviation Predicting Branch (DPB) to predict dose maps and patient set-up errors from PET scans within milliseconds after a proton therapy treatment.
+
+PROTOTWIN-PET is part of the PROTOTWIN project, which aims to develop dose verification methods for proton therapy using PET imaging. 
+
+You can access the paper, published at the *IEEE Transactions on Radiation and Plasma Medical Sciences* at the following link:
+
+**[PROTOTWIN-PET: A Deep Learning and GPU-based Workflow for Dose Verification in Proton Therapy With PET](https://ieeexplore.ieee.org/document/10847605)** 
 
 
 ## Set Up Environment 🧱
