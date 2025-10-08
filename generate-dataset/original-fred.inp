@@ -5,7 +5,7 @@ field<
     O=[0, 0, 0]
     pivot=[0.5, 0.5, 0.5]
     L=[48.3, 48.3, 33.5]
-    CTscan=/home/prototwin-pet/prototwin-pet/generate-dataset/../data/head-cort/dataset1/CT.mhd
+    CTscan=/home/pablo/prototwin-pet/generate-dataset/../data/head-cort/dataset1/CT.mhd
 field>
 
 # Conversión de HU a material:
@@ -13,7 +13,7 @@ lUseInternalHU2Mat=False
 lAllowHUClamping=True  # A partir de 1300 se corta (hay poco más allá del hueso)
 lWaterIpotForHUMaterials=False
 
-activation: isotopes = [C11, N13, O15, K38];
+activation: isotopes = [C11, N13, O15, K38, P200, P210, P280, P443, P480, P373, P390, P163, P231, P510, P368, P520, P612, P632, P691, P711, P126]; userCSPolicy = yes; userCSPath = /home/pablo/prototwin-pet/generate-dataset/./prompt-gamma-cross-sections
 
 # Set the seed:
 randSeedRoot = 42

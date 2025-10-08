@@ -53,10 +53,19 @@ final_time = 40  # minutes
 irradiation_time = 2  # minutes  # time spent delivering the field
 field_setup_time = 2  # minutes  # time spent setting up the field (gantry rotation)
 isotope_list = ['C11', 'N13', 'O15', 'K38'] #, 'C10', 'O14', 'P30']
+# prompt_gamma_list = ['2p000', '2p100', '2p800', '4p438', '4p800',  
+#                      '3p737', '3p904', '1p635', '2p313', '5p105',
+#                      '3p680', '5p200', '6p129', '6p320', '6p917',
+#                      '7p116', '1p266']  # prompt gamma lines
+prompt_gamma_list = ['P200', 'P210', 'P280', 'P443', 'P480',
+        'P373', 'P390', 'P163', 'P231', 'P510',
+        'P368', 'P520', 'P612', 'P632', 'P691',
+        'P711', 'P126']
+prompt_gamma_cross_sections_path = os.path.join(script_dir, "./prompt-gamma-cross-sections")
 #
 #   MONTE CARLO SIMULATION OF THE TREATMENT
-N_sobps = 200
-nprim = 2.8e5 # number of primary particles
+N_sobps = 1
+nprim = 1e3  ###2.8e5 # number of primary particles
 variance_reduction = True
 maxNumIterations = 10  # Number of times the simulation is repeated (only if variance reduction is True)
 stratified_sampling = True
@@ -80,8 +89,12 @@ scanner = scanner.lower()
 
 if not os.path.exists(dataset_folder):
     os.makedirs(dataset_folder)
-    os.makedirs(os.path.join(dataset_folder, "activity/"))
-    os.makedirs(os.path.join(dataset_folder, "dose/"))
+if not os.path.exists(os.path.join(dataset_folder, "activity")):
+    os.makedirs(os.path.join(dataset_folder, "activity"))
+if not os.path.exists(os.path.join(dataset_folder, "dose")):
+    os.makedirs(os.path.join(dataset_folder, "dose"))
+if not os.path.exists(os.path.join(dataset_folder, "prompt-gamma-production")):
+    os.makedirs(os.path.join(dataset_folder, "prompt-gamma-production"))
 
 # Move the mcgpu input to the patient folder
 shutil.copy(mcgpu_input_location, dataset_folder)
@@ -127,7 +140,9 @@ L_list = [
     uncropped_shape[2] * voxel_size[2] / 10,
 ]  # in cm
 L_line = f"    L=[{', '.join(map(str, L_list))}]"
-activation_line = f"activation: isotopes = [{', '.join(isotope_list)}];"  # activationCode=4TS-747-PSI"  # line introduced in the fred.inp file to score the activation
+activation_line = (f"activation: isotopes = [{', '.join(isotope_list + prompt_gamma_list)}]; "
+                   "userCSPolicy = yes; "
+                   f"userCSPath = {prompt_gamma_cross_sections_path}")  # line introduced in the fred.inp file to score the activation
 hu2densities_path = os.path.join(script_dir, "../data/ipot-hu2materials.txt")
 with open(hu2densities_path, "r+") as file:
     original_schneider_lines = file.readlines()
@@ -532,12 +547,35 @@ for sobp_num in range(sobp_start, sobp_start + N_sobps):
                 activation_tissue[tissue_mask] *= field_factor_dict[isotope][tissue]
                 activation_tissue[~tissue_mask] = 0
                 activity_isotope_dict[isotope] += activation_tissue
+        
+        total_prompt_gamma_production = 0
+        for prompt_gamma_line in prompt_gamma_list:
+            # prompt_gamma_file_path = os.path.join(mhd_folder_path, f'{prompt_gamma_line}_scorer.mhd')  # For FRED v 3.6
+            prompt_gamma_file_path = os.path.join(
+                mhd_folder_path, f"Phantom.Activation_{prompt_gamma_line}.mhd"
+            )  # For FRED v 3.7
+            prompt_gamma_production = crop_save_image(
+                prompt_gamma_file_path,
+                xmin=xmin,
+                xmax=xmax,
+                ymin=ymin,
+                ymax=ymax,
+                zmin=zmin,
+                zmax=zmax,
+                uncropped_shape=uncropped_shape,
+                save_raw=save_raw,
+                crop_body=True,
+                body_coords=body_coords,
+            )
+            # Currently not using the prompt gammas for anything, but they are scored in case they are needed in the future
+            total_prompt_gamma_production += prompt_gamma_production
 
     # Scaling the dose to the target dose
     # this is done by matching the median dose in the CTV to the target dose (as found acceptable in https://doi.org/10.1186/s13014-022-02143-x)
     total_dose_CTV = total_dose[CTV_mask]
     scaling_factor = target_dose / np.median(total_dose_CTV)
     total_dose = total_dose * scaling_factor
+    total_prompt_gamma_production = total_prompt_gamma_production * scaling_factor
     for isotope in isotope_list:
         activity_isotope_dict[isotope] = activity_isotope_dict[isotope] * scaling_factor
         total_activity += activity_isotope_dict[isotope]
@@ -640,42 +678,87 @@ for sobp_num in range(sobp_start, sobp_start + N_sobps):
         Trans=Trans,
         HL=final_shape // 2,
     )
+    
+    # Saving prompt gamma production
+    prompt_gamma_npy_path = os.path.join(dataset_folder, f"prompt-gamma-production/sobp{sobp_num}.npy")
+    prompt_gamma_raw_path = None  # os.path.join(mhd_folder_path, 'Dose.raw')
+    print(f"Total number of prompt gamma events (all isotopes): {np.sum(total_prompt_gamma_production):.3e}")
+    total_prompt_gamma_production = crop_save_npy(
+        total_prompt_gamma_production,
+        prompt_gamma_npy_path,
+        raw_path=prompt_gamma_raw_path,
+        Trans=Trans,
+        HL=final_shape // 2,
+    )
 
     # plot the central slice of the three saved arrays in three imshow rows
     CT_final = np.load(CT_npy_path)
     if sobp_num < 5:
-        # Plot slice
-        fig, ax = plt.subplots(4, 1, figsize=(3, 9))
-        ax[0].imshow(total_activity[:, total_activity.shape[1] // 2, :].T, cmap="jet")
-        ax[0].set_title("Activation")
-        ax[1].imshow(
-            reconstructed_activity[:, reconstructed_activity.shape[1] // 2, :].T,
+        # PROMPT GAMMA PLOT
+        mid = total_prompt_gamma_production.shape[1] // 2
+
+        fig, ax = plt.subplots(1, 2, figsize=(12, 6), constrained_layout=True)
+
+        # --- Left panel: prompt-gamma over CT ---
+        # Draw CT first (background)
+        ct0 = ax[0].imshow(
+            CT_final[:, mid, :].T,
+            cmap="gray",
+            vmin=-225, vmax=125,
+            origin="lower",
+            zorder=0,
+            aspect = voxel_size[2]/voxel_size[0]
+        )
+
+        # Overlay prompt-gamma
+        im_pg = ax[0].imshow(
+            total_prompt_gamma_production[:, mid, :].T,
+            cmap="inferno",
+            alpha=0.8,
+            origin="lower",
+            zorder=1,
+            aspect = voxel_size[2]/voxel_size[0]
+        )
+        ax[0].set_title("Total Prompt Gamma Production")
+
+        cbar0 = plt.colorbar(im_pg, ax=ax[0], orientation="horizontal")
+        cbar0.set_label("Prompt Gamma Events")
+
+        # --- Right panel: dose over CT ---
+        # Draw CT first (background)
+        ct1 = ax[1].imshow(
+            CT_final[:, mid, :].T,
+            cmap="gray",
+            vmin=-225, vmax=125,
+            origin="lower",
+            zorder=0,
+            aspect = voxel_size[2]/voxel_size[0]
+        )
+
+        # Overlay dose
+        im_dose = ax[1].imshow(
+            total_dose[:, mid, :].T,
             cmap="jet",
+            alpha=0.8,
+            origin="lower",
+            zorder=1,
+            aspect = voxel_size[2]/voxel_size[0]
         )
-        ax[1].set_title("Activity")
-        ax[2].imshow(total_dose[:, total_dose.shape[1] // 2, :].T, cmap="jet")
-        ax[2].set_title("Dose")
-        # add colorbar for dose
-        cbar = plt.colorbar(
-            ax[2].imshow(total_dose[:, total_dose.shape[1] // 2, :].T, cmap="jet"),
-            ax=ax[2],
-            orientation="horizontal",
-        )
-        cbar.set_label("Dose (Gy)")
-        ax[3].imshow(CT_final[:, CT_final.shape[1] // 2, :].T, cmap="gray")
-        # add CTV
-        CTV_mask_path = os.path.join(dataset_folder, "CTV_mask.npy")
-        CTV_mask_cropped = crop_save_npy(
-            CTV_mask, CTV_mask_path, raw_path=None, Trans=Trans, HL=final_shape // 2
-        )
-        ax[3].imshow(
-            CTV_mask_cropped[:, CTV_mask_cropped.shape[1] // 2, :].T,
-            cmap="jet",
-            alpha=0.5,
-        )
-        ax[3].set_title("CT")
-        plt.tight_layout()
-        plt.savefig(os.path.join(dataset_folder, f"plot{sobp_num}.png"))
+        ax[1].set_title("Dose")
+
+        cbar1 = plt.colorbar(im_dose, ax=ax[1], orientation="horizontal")
+        cbar1.set_label("Dose (Gy)")
+
+        # Remove ticks and spines
+        for a in ax:
+            a.set_xticks([])
+            a.set_yticks([])
+            for spine in a.spines.values():
+                spine.set_visible(False)
+
+        plt.savefig(os.path.join(dataset_folder, f"plot{sobp_num}_prompt_gammas.png"), dpi=500)
+        plt.close(fig)
+
 
     del total_activity, total_dose, reconstructed_activity, activation_tissue
     gc.collect()
