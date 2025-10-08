@@ -1,4 +1,4 @@
-# RUN WITH CONDA ENVIRONMENTS recon (octopus PC) OR prototwin-pet (environment.yml, install for any PC with conda env create -f environment.yml)
+# RUN WITH CONDA ENVIRONMENT prototwin-pet (environment.yml, install for any PC with conda env create -f environment.yml)
 
 import os
 import sys
