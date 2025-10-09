@@ -20,10 +20,10 @@
 
 matRad_rc; %If this throws an error, run it from the parent directory first to set the paths
 
-patient_name = 'HN-CHUM-018';
-load HN-CHUM-018.mat
-% patient_name = 'head-cort';
-% load HEAD_AND_NECK.mat;  % selected patient from CORT dataset
+%patient_name = 'HN-CHUM-018';
+%load HN-CHUM-018.mat
+patient_name = 'prostate-cort';
+load PROSTATE.mat;  % selected patient from CORT dataset
 
 couch_idx = find(strcmpi(cst(:,2), 'COUCH'));
 cst(couch_idx, :) = [];  % to remove couch in order to add a posterior beam (from below the couch)
@@ -66,8 +66,8 @@ pln.propDoseCalc.calcLET = 0;
 %%
 % Now we have to set the remaining plan parameters.
 pln.numOfFractions        = 30;
-pln.propStf.gantryAngles  = [75 -75];
-pln.propStf.couchAngles   = [-15 15];
+pln.propStf.gantryAngles  = [90];
+pln.propStf.couchAngles   = [0];
 pln.propStf.bixelWidth    = 5;  % Standard protons
 pln.propStf.numOfBeams    = numel(pln.propStf.gantryAngles);
 pln.propStf.isoCenter     = ones(pln.propStf.numOfBeams,1) * matRad_getIsoCenter(cst,ct,0);
@@ -115,7 +115,7 @@ machine_data = machine.data;
 dataToSave = {'ct', 'CT_cube', 'CT_resolution', 'CT_offset', 'cst', ...
     'body_indices', 'CTV_indices', 'stf', 'weights', 'machine_data'};
 
-output_folder_repo = sprintf('/home/pablo/prototwin-pet/data/%s', patient_name);
+output_folder_repo = sprintf('./data/%s', patient_name);
 
 if ~exist(output_folder_repo, 'dir')
     mkdir(output_folder_repo);
