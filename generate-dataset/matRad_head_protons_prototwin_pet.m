@@ -66,8 +66,8 @@ pln.propDoseCalc.calcLET = 0;
 %%
 % Now we have to set the remaining plan parameters.
 pln.numOfFractions        = 30;
-pln.propStf.gantryAngles  = [90];
-pln.propStf.couchAngles   = [0];
+pln.propStf.gantryAngles  = 90;
+pln.propStf.couchAngles   = 0;
 pln.propStf.bixelWidth    = 5;  % Standard protons
 pln.propStf.numOfBeams    = numel(pln.propStf.gantryAngles);
 pln.propStf.isoCenter     = ones(pln.propStf.numOfBeams,1) * matRad_getIsoCenter(cst,ct,0);
