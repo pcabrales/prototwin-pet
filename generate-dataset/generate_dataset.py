@@ -32,7 +32,7 @@ dev = xp.cuda.Device(0)
 #   PATIENT DATA AND OUTPUT FOLDERS
 dataset_num = 1
 seed_number = 42
-patient_name = 'head-cort'
+patient_name = 'prostate-cort'
 dataset_folder = os.path.join(
     script_dir, f"../data/{patient_name}/dataset{dataset_num}"
 )  # Folder to save the numpy arrays for model training
@@ -43,9 +43,9 @@ mhd_file = os.path.join(dataset_folder, "CT.mhd")  # mhd file with the CT
 matRad_output = loadmat(
     os.path.join(script_dir, f"../data/{patient_name}/matRad-output.mat")
 )
-uncropped_shape = [161, 161, 67]  # Uncropped CT shape
-final_shape = [128, 128, 64]  # Final shape for the images, considering only where activity and dose are present (irradiated areas)
-voxel_size = np.array([3, 3, 5])  # in mm
+uncropped_shape = [183, 183, 90]  # Uncropped CT shape
+final_shape = [183, 183, 90]  # Final shape for the images, considering only where activity and dose are present (irradiated areas)
+voxel_size = np.array([3, 3, 3])  # in mm
 #
 #   CHOOSING A DOSE VERIFICATION APPROACH
 initial_time = 10  # minutes time spent before placing the patient in a PET scanner after the final field is delivered
@@ -71,21 +71,8 @@ maxNumIterations = 10  # Number of times the simulation is repeated (only if var
 stratified_sampling = True
 Espread = 0.006  # fractional energy spread (0.6%)
 target_dose = 2.18  # Gy  (corresponds to a standard 72 Gy, 33 fractions treatment)
-#
-# PET SIMULATION
-scanner = 'vision'  # Choose between "vision" and "quadra"
-mcgpu_location = os.path.join(script_dir, './pet-simulation-reconstruction/mcgpu-pet')
-mcgpu_input_location = os.path.join(mcgpu_location, f"MCGPU-PET-{scanner}.in")
-mcgpu_executable_location = os.path.join(mcgpu_location, 'MCGPU-PET.x')
-materials_path = os.path.join(mcgpu_location, "materials")
-#
-# PET RECONSTRUCTION
-num_subsets=2
-osem_iterations=3
 # -----------------------------------------------------------------------------------------------------------------------------------------
 
-# make scanner into lowercase
-scanner = scanner.lower()
 
 if not os.path.exists(dataset_folder):
     os.makedirs(dataset_folder)
@@ -95,24 +82,6 @@ if not os.path.exists(os.path.join(dataset_folder, "dose")):
     os.makedirs(os.path.join(dataset_folder, "dose"))
 if not os.path.exists(os.path.join(dataset_folder, "prompt-gamma-production")):
     os.makedirs(os.path.join(dataset_folder, "prompt-gamma-production"))
-
-# Move the mcgpu input to the patient folder
-shutil.copy(mcgpu_input_location, dataset_folder)
-mcgpu_input_location = os.path.join(
-    dataset_folder, os.path.basename(mcgpu_input_location)
-)
-with open(mcgpu_input_location, "r") as file:
-    lines = file.readlines()
-keyword_materials = "mcgpu.gz"  # lines specifying the materials include this string because it is the material composition file
-for idx, input_line in enumerate(lines):
-    if keyword_materials in input_line:
-        lines[idx] = materials_path + input_line
-    elif "TOTAL PET SCAN ACQUISITION TIME" in input_line:
-        lines[
-            idx
-        ] = f"{(final_time - initial_time) * 60:.2f}            # TOTAL PET SCAN ACQUISITION TIME [seconds]\n"
-with open(mcgpu_input_location, "w") as file:
-    file.writelines(lines)
 
 # Convert DICOM to mhd to be processed by FRED, provide matrad_output to remove everything outside the body and avoid the couch interfering with the simulation
 convert_CT_to_mhd(
@@ -322,24 +291,6 @@ crop_save_npy(
     CT_cropped, CT_npy_path, raw_path=CT_raw_path, Trans=Trans, HL=final_shape // 2
 )
 
-# Generate the sensitivity for the reconstruction
-sensitivity_location = os.path.join(dataset_folder, f"sensitivity-{scanner}.npy")
-if os.path.exists(sensitivity_location):
-    sensitivity_array = np.load(
-        sensitivity_location
-    )  # check if sensitivity array already exists
-else:
-    sensitivity_array = generate_sensitivity(
-        cropped_shape,
-        voxel_size,
-        CT_cropped,
-        mcgpu_location,
-        mcgpu_input_location,
-        sensitivity_location,
-        hu2densities_path,
-        factor_activity=1.0,
-    )
-
 # MCGPU-PET effective isotope mean lives (not half-lives)
 # Half lives taking into account the slow component of the biological washout (averaged across tissues)+ the physical decay
 # E.g. for C11, Mean_life_efectiva = 1 / (ln (2) / 1223.4 s + ln(2) / 10000)
@@ -455,7 +406,7 @@ for sobp_num in range(sobp_start, sobp_start + N_sobps):
             pb_direction = pos_target_deviated - sourcePoint_field
             pb_direction = pb_direction / np.linalg.norm(pb_direction)
             sourcePoint_bixel = (
-                pos_target_deviated - pb_direction * 8
+                pos_target_deviated - pb_direction * 25 ### BEAM HAS TO START OUTSIDE THE BODY (8 cm is usually ok for neck, but not for prostate)
             )  # x cm from target to get out of the body
             for pb_energy in bixel[4][0]:
                 idx_closest = min(
@@ -491,6 +442,7 @@ for sobp_num in range(sobp_start, sobp_start + N_sobps):
         dose_file_path = os.path.join(
             mhd_folder_path, "Phantom.Dose.mhd"
         )  # For FRED v 3.7
+        print(f"Cropping and saving dose for field {field_num}")
         total_dose += crop_save_image(
             dose_file_path,
             uncropped_shape=uncropped_shape,
@@ -584,76 +536,6 @@ for sobp_num in range(sobp_start, sobp_start + N_sobps):
     max_activity = np.max(total_activity) / np.prod(voxel_size / 10)
     print(f"Maximum activity: {max_activity}")
 
-    ## MCGPU-PET Simulation
-    sobp_i_location = os.path.join(dataset_folder, sobp_folder_name)
-    merged_raw_file = os.path.join(sobp_i_location, f"merged_MCGPU_PET.psf.raw")
-    with open(merged_raw_file, "wb") as merged_file:
-        pass  # Create an empty file to start with
-
-    for isotope in isotope_list:
-        activity_isotope = activity_isotope_dict[isotope]
-
-        out_path = os.path.join(sobp_i_location, "phantom.vox")
-        gen_voxel(
-            CT_cropped,
-            activity_isotope,
-            out_path,
-            hu2densities_path,
-            nvox=cropped_shape,
-            dvox=voxel_size / 10,
-        )  # dvox in cm
-        shutil.copy(mcgpu_input_location, sobp_i_location)  # copy the input file
-        os.rename(
-            os.path.join(sobp_i_location, os.path.basename(mcgpu_input_location)),
-            os.path.join(sobp_i_location, "MCGPU-PET.in"),
-        )  # renaming the input file from whatever name it had
-
-        # Modify the input file to include the isotope's mean life
-        input_path = os.path.join(sobp_i_location, f"MCGPU-PET.in")
-        with open(input_path, "r") as file:
-            lines = file.readlines()
-        keyword = "# ISOTOPE MEAN LIFE"
-        for idx, input_line in enumerate(lines):
-            if keyword in input_line:
-                lines[idx] = " " + f"{mean_lives[isotope]} " + "# ISOTOPE MEAN LIFE"
-        with open(input_path, "w") as file:
-            file.writelines(lines)
-
-        # running mcgpu
-        command = [mcgpu_executable_location, "MCGPU-PET.in"]
-        subprocess.run(command, cwd=sobp_i_location)
-
-        # Writing the raw file to a single file with the detections of all isotopes
-        with open(merged_raw_file, "ab") as merged_file:
-            with open(
-                os.path.join(sobp_i_location, "MCGPU_PET.psf.raw"), "rb"
-            ) as isotope_file:
-                merged_file.write(isotope_file.read())
-
-    # Removing unnecessary files generated by MCGPU-PET
-    os.remove(os.path.join(sobp_i_location, "MCGPU_PET.psf.raw"))
-    os.remove(os.path.join(sobp_i_location, "phantom.vox"))
-    os.remove(os.path.join(sobp_i_location, "Energy_Sinogram_Spectrum.dat"))
-    os.remove(os.path.join(sobp_i_location, "MCGPU_PET.psf"))
-    # os.remove(os.path.join(sobp_i_location, "MCGPU-PET.in")
-
-    # Reconstruction with parallelproj
-    reconstructed_activity = parallelproj_listmode_reconstruction(
-        merged_raw_file,
-        img_shape=cropped_shape,
-        voxel_size=voxel_size,
-        scanner=scanner,
-        num_subsets=num_subsets,
-        osem_iterations=osem_iterations,
-        sensitivity_array=sensitivity_array,
-    )  # voxel_size in cm
-
-    # # Blurring simply with a Gaussian filter instead of the PET reconstruction:
-    # import cupy as cp
-    # from cupyx.scipy.ndimage import gaussian_filter
-    # sigma_blurring = 3.5 / 2.355 / voxel_size  # fwhm to sigma and mm to voxels
-    # reconstructed_activity = gaussian_filter(xp.asarray(total_activity, device="dev"), sigma=sigma_blurring).get()
-
     # Cropping and saving:
     # Saving dose
     dose_npy_path = os.path.join(dataset_folder, f"dose/sobp{sobp_num}.npy")
@@ -662,19 +544,6 @@ for sobp_num in range(sobp_start, sobp_start + N_sobps):
         total_dose,
         dose_npy_path,
         raw_path=dose_raw_path,
-        Trans=Trans,
-        HL=final_shape // 2,
-    )
-
-    # Saving activity
-    activity_raw_path = (
-        None  # os.path.join(sobp_i_location, "reconstructed_activity.raw")
-    )
-    activity_npy_path = os.path.join(dataset_folder, f"activity/sobp{sobp_num}.npy")
-    reconstructed_activity = crop_save_npy(
-        reconstructed_activity,
-        activity_npy_path,
-        raw_path=None,
         Trans=Trans,
         HL=final_shape // 2,
     )
@@ -760,7 +629,7 @@ for sobp_num in range(sobp_start, sobp_start + N_sobps):
         plt.close(fig)
 
 
-    del total_activity, total_dose, reconstructed_activity, activation_tissue
+    del total_activity, total_dose, activation_tissue
     gc.collect()
     shutil.copy(deviations_path, os.path.join(dataset_folder, "deviations.json.tmp"))
 
