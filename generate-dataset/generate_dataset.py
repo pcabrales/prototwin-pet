@@ -65,7 +65,7 @@ prompt_gamma_cross_sections_path = os.path.join(script_dir, "./prompt-gamma-cros
 #
 #   MONTE CARLO SIMULATION OF THE TREATMENT
 N_sobps = 1
-nprim = 1e3  ###2.8e5 # number of primary particles
+nprim = 2.8e5 # number of primary particles
 variance_reduction = True
 maxNumIterations = 10  # Number of times the simulation is repeated (only if variance reduction is True)
 stratified_sampling = True
