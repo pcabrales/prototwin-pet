@@ -98,6 +98,9 @@ resultGUI = matRad_fluenceOptimization(dij,cst,pln);
 names = cst(:,2);
 % Find names that include 'CTV' (case-insensitive)
 matches = cellfun(@(x) contains(x, 'CTV', 'IgnoreCase', true), names);
+if patient_name == 'prostate-cort'  %%%
+    matches = cellfun(@(x) contains(x, 'PTV', 'IgnoreCase', true), names);
+end
 % Get the row indices where the names include 'CTV'
 row_CTV_indices = find(matches);
 % Extract CTV_indices from cst{row_CTV_indices,4}{1,1}
