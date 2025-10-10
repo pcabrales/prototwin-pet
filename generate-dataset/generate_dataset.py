@@ -441,7 +441,7 @@ for sobp_num in range(sobp_start, sobp_start + N_sobps):
             pb_direction = pb_direction / np.linalg.norm(pb_direction)
             sourcePoint_bixel = (
                 pos_target_deviated - pb_direction * 8
-            )  # x cm from target to get out of the body
+            )  # x cm from target to get out of the body (8 cm is enough for head and prostate, might need more for other locations, like prostate)
             for pb_energy in bixel[4][0]:
                 idx_closest = min(
                     range(len(energy_array)),
@@ -535,6 +535,8 @@ for sobp_num in range(sobp_start, sobp_start + N_sobps):
 
     # Scaling the dose to the target dose
     # this is done by matching the median dose in the CTV to the target dose (as found acceptable in https://doi.org/10.1186/s13014-022-02143-x)
+    if CTV_mask.sum() == 0:
+        raise ValueError("CTV mask is empty, cannot scale dose to target dose.")
     total_dose_CTV = total_dose[CTV_mask]
     scaling_factor = target_dose / np.median(total_dose_CTV)
     total_dose = total_dose * scaling_factor

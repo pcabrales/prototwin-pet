@@ -81,6 +81,8 @@ The `data/head-cort` folder already includes the treatment plan struct (`matRad-
     - Save the .mat file by clicking "Import". Save it to `/path/to/matRad-master/phantoms/HN-CHUM-018.mat`.
     - Copy the provided `generate_dataset/matRad_head_protons_prototwin_pet.m` file to the MatRad base directory and run it. This is adapted from the `/matRad/examples/matRad_example5_protons.m` script, found [here](https://github.com/e0404/matRad/blob/master/examples/matRad_example5_protons.m).
 
+In both options, make sure that a CTV structure exists with a name containing "CTV" in the RTSTRUCT file, as it is used in the dataset generation script to scale the dose to the target dose.
+
 ### Step 2: Generate Dataset 🛠️
 Run the dataset generation script, changing the `USER-DEFINED PR0TOTWIN-PET PARAMETERS` inside the script as needed:
 ```bash
