@@ -291,17 +291,6 @@ crop_save_npy(
     CT_cropped, CT_npy_path, raw_path=CT_raw_path, Trans=Trans, HL=final_shape // 2
 )
 
-# MCGPU-PET effective isotope mean lives (not half-lives)
-# Half lives taking into account the slow component of the biological washout (averaged across tissues)+ the physical decay
-# E.g. for C11, Mean_life_efectiva = 1 / (ln (2) / 1223.4 s + ln(2) / 10000)
-# for O15, Mean_life_efectiva = 1 / (ln (2) / 2.04 min / 60 sec s + 0.024 min / 60 sec)
-mean_lives = {"C11": 1572.6, "N13": 641.3, "O15": 164.9, "K38": 522.8}  # in seconds
-mean_lives_no_washout = {
-    "C11": 1765.0,
-    "N13": 862.6,
-    "O15": 176.6,
-    "K38": 661.07,
-}  # in seconds
 
 sobp_start = 0
 for sobp_num in range(sobp_start, sobp_start + N_sobps):
