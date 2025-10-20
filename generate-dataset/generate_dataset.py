@@ -12,14 +12,10 @@ import numpy as np
 import array_api_compat.cupy as xp
 from scipy.io import loadmat
 from utils import (
-    get_isotope_factors,
     crop_save_image,
     crop_save_npy,
-    gen_voxel,
     convert_CT_to_mhd,
-    generate_sensitivity,
 )
-from utils_parallelproj import parallelproj_listmode_reconstruction
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(script_dir)
@@ -28,30 +24,24 @@ dev = xp.cuda.Device(0)
 # ----------------------------------------------------------------------------------------------------------------------------------------
 # USER-DEFINED PR0TOTWIN-PET PARAMETERS
 # ----------------------------------------------------------------------------------------------------------------------------------------
-#
+
 #   PATIENT DATA AND OUTPUT FOLDERS
 dataset_num = 1
 seed_number = 42
 patient_name = 'prostate-cort'
-dataset_folder = os.path.join(
-    script_dir, f"../data/{patient_name}/dataset{dataset_num}"
-)  # Folder to save the numpy arrays for model training
+dataset_folder = os.path.join(script_dir, f"../data/{patient_name}/dataset{dataset_num}")  # Folder to save the numpy arrays for model training
+
 # Path to the DICOM directory (only if necessary, currently the CT can be loaded from matRad-output.mat)
 dicom_dir = None  # os.path.join(dataset_folder, 'CT')
 mhd_file = os.path.join(dataset_folder, "CT.mhd")  # mhd file with the CT
+
 # Load matRad treatment plan parameters (CURRENTLY ONLY SUPPORTS MATRAD OUTPUT)
-matRad_output = loadmat(
-    os.path.join(script_dir, f"../data/{patient_name}/matRad-output.mat")
-)
+matRad_output = loadmat(os.path.join(script_dir, f"../data/{patient_name}/matRad-output.mat"))
+
 uncropped_shape = [183, 183, 90]  # Uncropped CT shape
 final_shape = [183, 183, 90]  # Final shape for the images, considering only where activity and dose are present (irradiated areas)
 voxel_size = np.array([3, 3, 3])  # in mm
-#
-#   CHOOSING A DOSE VERIFICATION APPROACH
-initial_time = 10  # minutes time spent before placing the patient in a PET scanner after the final field is delivered
-final_time = 40  # minutes
-irradiation_time = 2  # minutes  # time spent delivering the field
-field_setup_time = 2  # minutes  # time spent setting up the field (gantry rotation)
+
 isotope_list = ['C11', 'N13', 'O15', 'K38'] #, 'C10', 'O14', 'P30']
 # prompt_gamma_list = ['2p000', '2p100', '2p800', '4p438', '4p800',  
 #                      '3p737', '3p904', '1p635', '2p313', '5p105',
@@ -62,7 +52,7 @@ prompt_gamma_list = ['P200', 'P210', 'P280', 'P443', 'P480',
         'P368', 'P520', 'P612', 'P632', 'P691',
         'P711', 'P126']
 prompt_gamma_cross_sections_path = os.path.join(script_dir, "./prompt-gamma-cross-sections")
-#
+
 #   MONTE CARLO SIMULATION OF THE TREATMENT
 N_sobps = 1
 nprim = 2.8e5 # number of primary particles
@@ -103,6 +93,10 @@ washout_HU_regions = [
 if variance_reduction:
     nprim = nprim // maxNumIterations
 
+# ----------------------------------------------------------------------------------------------------------------------------------------
+# -------------------------------------------- Initial FRED inp file update --------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------------------------
+
 L_list = [
     uncropped_shape[0] * voxel_size[0] / 10,
     uncropped_shape[1] * voxel_size[1] / 10,
@@ -142,7 +136,10 @@ with open(fredinp_location, "w") as file:
                 f"varianceReduction: maxNumIterations={maxNumIterations};\n"
             )
 
-# Accessing structs
+# ----------------------------------------------------------------------------------------------------------------------------------------
+# -------------------------------------------- Accessing MATRAD structs ------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------------------------
+
 stf = matRad_output["stf"]
 weights = matRad_output["weights"].T[0]
 isocenter = stf[0, 0][5][0] / 10 - np.array(
@@ -253,11 +250,7 @@ HU_regions = [
     2995,
     2996,
 ]  # HU Regions
-max_param_deviation = 0.1  # deviation considered
-max_angle_deviation = 5 * np.pi / 180  # in radians
-max_beam_deviation = 0.5  # in cm
-HU_region = 0
-dict_deviations = {}  # dictionary to save deviations
+
 
 # Fix the random seed
 random.seed(seed_number)
@@ -291,344 +284,222 @@ crop_save_npy(
     CT_cropped, CT_npy_path, raw_path=CT_raw_path, Trans=Trans, HL=final_shape // 2
 )
 
+# ----------------------------------------------------------------------------------------------------------------------------------------
+# -------------------------------------------- Simulating each field with FRED -----------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------------------------
 
-sobp_start = 0
-for sobp_num in range(sobp_start, sobp_start + N_sobps):
-    # Create folder for each new deviated plan, which we call sobp because of the original name for the prostate
-    sobp_folder_name = f"plans_info/sobp{sobp_num}"
+# Create folder for each new deviated plan, which we call sobp because of the original name for the prostate
+sobp_folder_name = f"plans_info/sobp"
 
-    # Deviations in physical parameters (density and composition) for each HU region
-    HU_regions_deviations = [
-        np.random.uniform(-max_param_deviation, max_param_deviation, 14)
-        for k in range(len(HU_regions) - 1)
-    ]
+# Iterating over the fields
+plan_pb_num = 0  # to keep track of all bixels, or pencil beams (pb) in the plan
+total_dose = 0  # to add the dose of all fields
 
-    # Deviations in pacient displacement
-    delta_x = random.uniform(-max_beam_deviation, max_beam_deviation)
-    delta_y = -random.uniform(
-        -max_beam_deviation, max_beam_deviation
-    )  # patient moved up (towards the head) delta_y cm, which will show the beams further down in the image; minus sign because the y direction is inverted
-    delta_psi = random.uniform(
-        -max_angle_deviation, max_angle_deviation
-    )  # ONLY YAW, which makes physical sense since the couch might be slightly rotated, but not inclined or rolled
-
-    if sobp_num == 0:
-        delta_x = 0
-        delta_y = 0
-        delta_psi = 0
-        HU_regions_deviations = [0.0 for k in range(len(HU_regions) - 1)]
-
-    # Introduction of deviations in the HU regions
-    HU_region = 0
-    deviations = HU_regions_deviations[HU_region]
-    schneider_lines = original_schneider_lines.copy()
-    for j, line in enumerate(schneider_lines):
-        CTHU = j - 1002
-        if CTHU >= HU_regions[HU_region + 1]:
-            HU_region += 1
-            deviations = HU_regions_deviations[HU_region]
-        line_list = line.strip().split(" ")
-        if j >= 2:
-            values = np.array(line_list[5:]).astype(float)
-            values += values * deviations
-            values[1:] /= values[1:].sum() / 100
-            line_list[5:] = values.astype(str)
-        schneider_lines[j] = " ".join(line_list) + "\n"
-
-    # Rotation matrix
-    R = np.array(
-        [
-            [np.cos(delta_psi), 0, -np.sin(delta_psi)],
-            [0, 1, 0],
-            [np.sin(delta_psi), 0, np.cos(delta_psi)],
-        ]
+for field_num in range(num_fields):
+    print(f"\nField {field_num} / {num_fields}")
+    
+    # to keep track of all bixels, or pencil beams (pb) in the field
+    field_pb_num = 0    
+    pencil_beams = []  # to store all field pencil beams
+    
+    # Source point for the field (in cm)
+    sourcePoint_field = stf[0, field_num][9][0] / 10 + isocenter  # in cm
+    
+    # Get field data
+    field = stf[0, field_num][7][0]
+    
+    # Create folder for SOBP field
+    sobp_folder_location = os.path.join(dataset_folder, sobp_folder_name, f"field{field_num}")
+    os.makedirs(sobp_folder_location, exist_ok=True)
+    
+    # copy fred.inp intro new folder
+    fredinp_destination = os.path.join(sobp_folder_location, "fred.inp")  
+    shutil.copy(fredinp_location, fredinp_destination)
+    
+    for bixel_num, bixel in enumerate(field):
+        
+        pos_target = (bixel[2][0] / 10)  # in cm, MatRad gives it relative to the isocenter
+        
+        # Displace target
+        pos_target_deviated = pos_target + isocenter  
+        pb_direction = pos_target_deviated - sourcePoint_field
+        pb_direction = pb_direction / np.linalg.norm(pb_direction)
+        sourcePoint_bixel = (
+            pos_target_deviated - pb_direction * 25 ### BEAM HAS TO START OUTSIDE THE BODY (8 cm is usually ok for neck, but not for prostate)
+        )  # x cm from target to get out of the body
+        
+        for pb_energy in bixel[4][0]:
+            idx_closest = min(
+                range(len(energy_array)),
+                key=lambda energy_val: abs(energy_array[energy_val] - pb_energy),
+            )  # find closest energy to bixel energy
+            FWHM = FWHM_array[idx_closest]  # get FWHM for that energy
+            pencil_beam_line = (
+                f"pb: {field_pb_num} Phantom; particle = proton; T = {pb_energy}; Espread={Espread}; v={str(list(pb_direction))}; P={str(list(sourcePoint_bixel))};"
+                f"Xsec = gauss; FWHMx={FWHM}; FWHMy={FWHM}; nprim={nprim:.0f}; N={N_reference*weights[plan_pb_num]:.0f};" #nprim:sim particles, N to scale between them
+            )
+            field_pb_num += 1
+            plan_pb_num += 1
+            pencil_beams.append(pencil_beam_line)
+    
+    with open(fredinp_destination, "a", encoding="utf-8") as file:
+        file.write("\n".join(pencil_beams))
+        file.write("\n")
+        file.writelines(original_schneider_lines)
+    
+    # Execute fred
+    command = ["fred"]
+    subprocess.run(command, cwd=sobp_folder_location)
+    
+    # Crop and delete larger files
+    mhd_folder_path = os.path.join(
+        sobp_folder_location, "out/score"
+    )  # For FRED v 3.7
+    
+    # Dose
+    dose_file_path = os.path.join(
+        mhd_folder_path, "Phantom.Dose.mhd"
+    )  # For FRED v 3.7
+    print(f"Cropping and saving dose for field {field_num}")
+    total_dose += crop_save_image(
+        dose_file_path,
+        uncropped_shape=uncropped_shape,
+        xmin=xmin,
+        xmax=xmax,
+        ymin=ymin,
+        ymax=ymax,
+        zmin=zmin,
+        zmax=zmax,
+        crop_body=True,
+        body_coords=body_coords,
+        save_raw=save_raw,
     )
-    # Snippet to save deviations to dictionary
-    dict_deviations = {f"sobp{sobp_num}": [delta_x, delta_y, delta_psi * 180 / np.pi]}
-    deviations_path = os.path.join(dataset_folder, "deviations.json")
-    # If dictionary already exists, only append the new data
-    if os.path.exists(deviations_path):
-        with open(deviations_path, "r") as jsonfile:
-            existing_data = json.load(jsonfile)
-            existing_data.update(dict_deviations)
-    else:
-        existing_data = dict_deviations
-    with open(deviations_path, "w") as jsonfile:
-        json.dump(existing_data, jsonfile)
-
-    # Iterating over the fields
-    plan_pb_num = 0  # to keep track of all bixels, or pencil beams (pb) in the plan
-    total_dose = 0  # to add the dose of all fields
-    total_activity = 0  # to add the activity of all fields
-
-    activity_isotope_dict = {
-        isotope: 0 for isotope in isotope_list
-    }  # to store the activation for each isotope
-    for field_num in range(num_fields):
-        print(f"\nField {field_num} / {num_fields} of sobp {sobp_num}")
-        field_pb_num = (
-            0  # to keep track of all bixels, or pencil beams (pb) in the field
-        )
-        pencil_beams = []  # to store all field pencil beams
-        sourcePoint_field = stf[0, field_num][9][0] / 10 + isocenter  # in cm
-        field = stf[0, field_num][7][0]
-        sobp_folder_location = os.path.join(
-            dataset_folder, sobp_folder_name, f"field{field_num}"
-        )
-        os.makedirs(sobp_folder_location, exist_ok=True)
-        fredinp_destination = os.path.join(
-            sobp_folder_location, "fred.inp"
-        )  # copy fred.inp intro new folder
-        shutil.copy(fredinp_location, fredinp_destination)
-        for bixel_num, bixel in enumerate(field):
-            pos_target = (
-                bixel[2][0] / 10
-            )  # in cm, MatRad gives it relative to the isocenter
-            # Rotate target
-            pos_target_rotated = R @ pos_target
-            # Displace target
-            pos_target_deviated = [
-                pos_target_rotated[0] + delta_x,
-                pos_target_rotated[1],
-                pos_target_rotated[2] + delta_y,
-            ] + isocenter  # delta_y is added in the third dimension because we call y the superior inferior direction (head to feet), but the actual coordinate system is LPS (left-right, posterior-anterior, superior-inferior)
-            pb_direction = pos_target_deviated - sourcePoint_field
-            pb_direction = pb_direction / np.linalg.norm(pb_direction)
-            sourcePoint_bixel = (
-                pos_target_deviated - pb_direction * 25 ### BEAM HAS TO START OUTSIDE THE BODY (8 cm is usually ok for neck, but not for prostate)
-            )  # x cm from target to get out of the body
-            for pb_energy in bixel[4][0]:
-                idx_closest = min(
-                    range(len(energy_array)),
-                    key=lambda energy_val: abs(energy_array[energy_val] - pb_energy),
-                )  # find closest energy to bixel energy
-                FWHM = FWHM_array[idx_closest]  # get FWHM for that energy
-                pencil_beam_line = (
-                    f"pb: {field_pb_num} Phantom; particle = proton; T = {pb_energy}; Espread={Espread}; v={str(list(pb_direction))}; P={str(list(sourcePoint_bixel))};"
-                    f"Xsec = gauss; FWHMx={FWHM}; FWHMy={FWHM}; nprim={nprim:.0f}; N={N_reference*weights[plan_pb_num]:.0f};"
-                )
-                field_pb_num += 1
-                plan_pb_num += 1
-                pencil_beams.append(pencil_beam_line)
-
-        with open(fredinp_destination, "a", encoding="utf-8") as file:
-            file.write("\n".join(pencil_beams))
-            file.write("\n")
-            file.writelines(schneider_lines)
-
-        # Execute fred
-        command = ["fred"]
-        subprocess.run(command, cwd=sobp_folder_location)
-
-        # Crop and delete larger files
-        # mhd_folder_path = os.path.join(sobp_folder_location, "out/reg/Phantom")  # For FRED v 3.6
-        mhd_folder_path = os.path.join(
-            sobp_folder_location, "out/score"
+    
+    remaining_fields = num_fields - field_num - 1
+    
+    total_prompt_gamma_production = 0
+    for prompt_gamma_line in prompt_gamma_list:
+        # prompt_gamma_file_path = os.path.join(mhd_folder_path, f'{prompt_gamma_line}_scorer.mhd')  # For FRED v 3.6
+        prompt_gamma_file_path = os.path.join(
+            mhd_folder_path, f"Phantom.Activation_{prompt_gamma_line}.mhd"
         )  # For FRED v 3.7
-
-        # Dose
-        # dose_file_path = os.path.join(mhd_folder_path, 'Dose.mhd')  # For FRED v 3.6
-        dose_file_path = os.path.join(
-            mhd_folder_path, "Phantom.Dose.mhd"
-        )  # For FRED v 3.7
-        print(f"Cropping and saving dose for field {field_num}")
-        total_dose += crop_save_image(
-            dose_file_path,
-            uncropped_shape=uncropped_shape,
+        prompt_gamma_production = crop_save_image(
+            prompt_gamma_file_path,
             xmin=xmin,
             xmax=xmax,
             ymin=ymin,
             ymax=ymax,
             zmin=zmin,
             zmax=zmax,
+            uncropped_shape=uncropped_shape,
+            save_raw=save_raw,
             crop_body=True,
             body_coords=body_coords,
-            save_raw=save_raw,
         )
+        # Currently not using the prompt gammas for anything, but they are scored in case they are needed in the future
+        total_prompt_gamma_production += prompt_gamma_production
 
-        remaining_fields = num_fields - field_num - 1
-        field_initial_time = (
-            initial_time + (field_setup_time + irradiation_time) * remaining_fields
-        )  # taking into account the time spent setting up the other fields and delivering them
-        field_final_time = (
-            final_time + (field_setup_time + irradiation_time) * remaining_fields
-        )
-        field_factor_dict = get_isotope_factors(
-            field_initial_time,
-            field_final_time,
-            irradiation_time,
-            isotope_list=isotope_list,
-        )  # factors to multiply by the activation (N0) to get the number of decays in the given interval
+# Scaling the dose to the target dose
+# this is done by matching the median dose in the CTV to the target dose (as found acceptable in https://doi.org/10.1186/s13014-022-02143-x)
+total_dose_CTV = total_dose[CTV_mask]
+scaling_factor = target_dose / np.median(total_dose_CTV)
+total_dose = total_dose * scaling_factor
+total_prompt_gamma_production = total_prompt_gamma_production * scaling_factor
 
-        # Isotopes
-        for isotope in isotope_list:
-            # isotope_file_path = os.path.join(mhd_folder_path, f'{isotope}_scorer.mhd')  # For FRED v 3.6
-            isotope_file_path = os.path.join(
-                mhd_folder_path, f"Phantom.Activation_{isotope}.mhd"
-            )  # For FRED v 3.7
-            activation = crop_save_image(
-                isotope_file_path,
-                xmin=xmin,
-                xmax=xmax,
-                ymin=ymin,
-                ymax=ymax,
-                zmin=zmin,
-                zmax=zmax,
-                uncropped_shape=uncropped_shape,
-                save_raw=save_raw,
-                crop_body=True,
-                body_coords=body_coords,
-            )
+# Cropping and saving:
+# Saving dose
+dose_npy_path = os.path.join(dataset_folder, f"dose/sobp.npy")
+dose_raw_path = None  # os.path.join(mhd_folder_path, 'Dose.raw')
+total_dose = crop_save_npy(
+    total_dose,
+    dose_npy_path,
+    raw_path=dose_raw_path,
+    Trans=Trans,
+    HL=final_shape // 2,
+)
 
-            for tissue_num, tissue in enumerate(field_factor_dict[isotope].keys()):
-                tissue_mask = (CT_cropped >= washout_HU_regions[tissue_num]) & (
-                    CT_cropped < washout_HU_regions[tissue_num + 1]
-                )
-                activation_tissue = activation.copy()
-                activation_tissue[tissue_mask] *= field_factor_dict[isotope][tissue]
-                activation_tissue[~tissue_mask] = 0
-                activity_isotope_dict[isotope] += activation_tissue
-        
-        total_prompt_gamma_production = 0
-        for prompt_gamma_line in prompt_gamma_list:
-            # prompt_gamma_file_path = os.path.join(mhd_folder_path, f'{prompt_gamma_line}_scorer.mhd')  # For FRED v 3.6
-            prompt_gamma_file_path = os.path.join(
-                mhd_folder_path, f"Phantom.Activation_{prompt_gamma_line}.mhd"
-            )  # For FRED v 3.7
-            prompt_gamma_production = crop_save_image(
-                prompt_gamma_file_path,
-                xmin=xmin,
-                xmax=xmax,
-                ymin=ymin,
-                ymax=ymax,
-                zmin=zmin,
-                zmax=zmax,
-                uncropped_shape=uncropped_shape,
-                save_raw=save_raw,
-                crop_body=True,
-                body_coords=body_coords,
-            )
-            # Currently not using the prompt gammas for anything, but they are scored in case they are needed in the future
-            total_prompt_gamma_production += prompt_gamma_production
-
-    # Scaling the dose to the target dose
-    # this is done by matching the median dose in the CTV to the target dose (as found acceptable in https://doi.org/10.1186/s13014-022-02143-x)
-    total_dose_CTV = total_dose[CTV_mask]
-    scaling_factor = target_dose / np.median(total_dose_CTV)
-    total_dose = total_dose * scaling_factor
-    total_prompt_gamma_production = total_prompt_gamma_production * scaling_factor
-    for isotope in isotope_list:
-        activity_isotope_dict[isotope] = activity_isotope_dict[isotope] * scaling_factor
-        total_activity += activity_isotope_dict[isotope]
-    
-    # Get the maximum activity /cc
-    max_activity = np.max(total_activity) / np.prod(voxel_size / 10)
-    print(f"Maximum activity: {max_activity}")
-
-    # Cropping and saving:
-    # Saving dose
-    dose_npy_path = os.path.join(dataset_folder, f"dose/sobp{sobp_num}.npy")
-    dose_raw_path = None  # os.path.join(mhd_folder_path, 'Dose.raw')
-    total_dose = crop_save_npy(
-        total_dose,
-        dose_npy_path,
-        raw_path=dose_raw_path,
-        Trans=Trans,
-        HL=final_shape // 2,
-    )
-    
-    # Saving prompt gamma production
-    prompt_gamma_npy_path = os.path.join(dataset_folder, f"prompt-gamma-production/sobp{sobp_num}.npy")
-    prompt_gamma_raw_path = None  # os.path.join(mhd_folder_path, 'Dose.raw')
-    print(f"Total number of prompt gamma events (all isotopes): {np.sum(total_prompt_gamma_production):.3e}")
-    total_prompt_gamma_production = crop_save_npy(
-        total_prompt_gamma_production,
-        prompt_gamma_npy_path,
-        raw_path=prompt_gamma_raw_path,
-        Trans=Trans,
-        HL=final_shape // 2,
-    )
-
-    # plot the central slice of the three saved arrays in three imshow rows
-    CT_final = np.load(CT_npy_path)
-    if sobp_num < 5:
-        # PROMPT GAMMA PLOT
-        mid = total_prompt_gamma_production.shape[1] // 2
-
-        fig, ax = plt.subplots(1, 2, figsize=(12, 6), constrained_layout=True)
-
-        # --- Left panel: prompt-gamma over CT ---
-        # Draw CT first (background)
-        ct0 = ax[0].imshow(
-            CT_final[:, mid, :].T,
-            cmap="gray",
-            vmin=-225, vmax=125,
-            origin="lower",
-            zorder=0,
-            aspect = voxel_size[2]/voxel_size[0]
-        )
-
-        # Overlay prompt-gamma
-        im_pg = ax[0].imshow(
-            total_prompt_gamma_production[:, mid, :].T,
-            cmap="inferno",
-            alpha=0.8,
-            origin="lower",
-            zorder=1,
-            aspect = voxel_size[2]/voxel_size[0]
-        )
-        ax[0].set_title("Total Prompt Gamma Production")
-
-        cbar0 = plt.colorbar(im_pg, ax=ax[0], orientation="horizontal")
-        cbar0.set_label("Prompt Gamma Events")
-
-        # --- Right panel: dose over CT ---
-        # Draw CT first (background)
-        ct1 = ax[1].imshow(
-            CT_final[:, mid, :].T,
-            cmap="gray",
-            vmin=-225, vmax=125,
-            origin="lower",
-            zorder=0,
-            aspect = voxel_size[2]/voxel_size[0]
-        )
-
-        # Overlay dose
-        im_dose = ax[1].imshow(
-            total_dose[:, mid, :].T,
-            cmap="jet",
-            alpha=0.8,
-            origin="lower",
-            zorder=1,
-            aspect = voxel_size[2]/voxel_size[0]
-        )
-        ax[1].set_title("Dose")
-
-        cbar1 = plt.colorbar(im_dose, ax=ax[1], orientation="horizontal")
-        cbar1.set_label("Dose (Gy)")
-
-        # Remove ticks and spines
-        for a in ax:
-            a.set_xticks([])
-            a.set_yticks([])
-            for spine in a.spines.values():
-                spine.set_visible(False)
-
-        plt.savefig(os.path.join(dataset_folder, f"plot{sobp_num}_prompt_gammas.png"), dpi=500)
-        plt.close(fig)
+# Saving prompt gamma production
+prompt_gamma_npy_path = os.path.join(dataset_folder, f"prompt-gamma-production/sobp.npy")
+prompt_gamma_raw_path = None  # os.path.join(mhd_folder_path, 'Dose.raw')
+print(f"Total number of prompt gamma events (all isotopes): {np.sum(total_prompt_gamma_production):.3e}")
+total_prompt_gamma_production = crop_save_npy(
+    total_prompt_gamma_production,
+    prompt_gamma_npy_path,
+    raw_path=prompt_gamma_raw_path,
+    Trans=Trans,
+    HL=final_shape // 2,
+)
 
 
-    del total_activity, total_dose, activation_tissue
-    gc.collect()
-    shutil.copy(deviations_path, os.path.join(dataset_folder, "deviations.json.tmp"))
+# ----------------------------------------------------------------------------------------------------------------------------------------
+# ---------------------------- plot the central slice of the three saved arrays in three imshow rows -------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------------------------
+
+CT_final = np.load(CT_npy_path)
+
+# PROMPT GAMMA PLOT
+mid = total_prompt_gamma_production.shape[1] // 2
+fig, ax = plt.subplots(1, 2, figsize=(12, 6), constrained_layout=True)
+# --- Left panel: prompt-gamma over CT ---
+# Draw CT first (background)
+ct0 = ax[0].imshow(
+    CT_final[:, mid, :].T,
+    cmap="gray",
+    vmin=-225, vmax=125,
+    origin="lower",
+    zorder=0,
+    aspect = voxel_size[2]/voxel_size[0]
+)
+# Overlay prompt-gamma
+im_pg = ax[0].imshow(
+    total_prompt_gamma_production[:, mid, :].T,
+    cmap="inferno",
+    alpha=0.8,
+    origin="lower",
+    zorder=1,
+    aspect = voxel_size[2]/voxel_size[0]
+)
+ax[0].set_title("Total Prompt Gamma Production")
+cbar0 = plt.colorbar(im_pg, ax=ax[0], orientation="horizontal")
+cbar0.set_label("Prompt Gamma Events")
+# --- Right panel: dose over CT ---
+# Draw CT first (background)
+ct1 = ax[1].imshow(
+    CT_final[:, mid, :].T,
+    cmap="gray",
+    vmin=-225, vmax=125,
+    origin="lower",
+    zorder=0,
+    aspect = voxel_size[2]/voxel_size[0]
+)
+# Overlay dose
+im_dose = ax[1].imshow(
+    total_dose[:, mid, :].T,
+    cmap="jet",
+    alpha=0.8,
+    origin="lower",
+    zorder=1,
+    aspect = voxel_size[2]/voxel_size[0]
+)
+ax[1].set_title("Dose")
+cbar1 = plt.colorbar(im_dose, ax=ax[1], orientation="horizontal")
+cbar1.set_label("Dose (Gy)")
+# Remove ticks and spines
+for a in ax:
+    a.set_xticks([])
+    a.set_yticks([])
+    for spine in a.spines.values():
+        spine.set_visible(False)
+plt.savefig(os.path.join(dataset_folder, f"plot_prompt_gammas.png"), dpi=500)
+plt.close(fig)
+
+del total_dose  
+gc.collect()
 
 # Remove unnecessary files
-for sobp_num in range(sobp_start, sobp_start + N_sobps):
-    for field_num in range(num_fields):
-        sobp_folder_location = os.path.join(
-            dataset_folder, f"plans_info/sobp{sobp_num}/field{field_num}"
-        )
-        # os.remove(os.path.join(sobp_folder_location, "out/dEdx.txt"))  # For FRED v 3.6
-        os.remove(os.path.join(sobp_folder_location, "out/log/materials.txt"))
-        os.remove(os.path.join(sobp_folder_location, "out/log/run.inp"))
-        # os.remove(os.path.join(sobp_folder_location, "out/log/parsed.inp"))  # For FRED v 3.6
+for field_num in range(num_fields):
+    sobp_folder_location = os.path.join(
+        dataset_folder, f"plans_info/sobp/field{field_num}"
+    )
+    os.remove(os.path.join(sobp_folder_location, "out/log/materials.txt"))
+    os.remove(os.path.join(sobp_folder_location, "out/log/run.inp"))
