@@ -161,7 +161,7 @@ model = nnFormer(
 model_dir = os.path.join(script_dir, f'models/trained-models/{model_name}.pth')
 timing_dir = os.path.join(script_dir, f'models/training-times/training-time-{model_name}.txt')
 losses_dir = os.path.join(script_dir, f'models/losses/{model_name}-loss.csv')
-n_epochs = 5
+n_epochs = 600
 patience += 50
 accumulation_steps = (
     4 // batch_size
