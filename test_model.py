@@ -13,11 +13,6 @@ font_path = os.path.join(script_dir, 'images/Times_New_Roman.ttf')
 font_manager.fontManager.addfont(font_path)
 plt.rcParams['font.serif'] = 'Times New Roman'
 
-script_dir = os.path.dirname(os.path.abspath(__file__))
-font_path = os.path.join(script_dir, "images/Times_New_Roman.ttf")
-font_manager.fontManager.addfont(font_path)
-plt.rcParams["font.serif"] = "Times New Roman"
-
 
 def test(
     trained_model,
