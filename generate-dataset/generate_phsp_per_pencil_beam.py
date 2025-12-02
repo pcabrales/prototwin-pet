@@ -294,6 +294,9 @@ plan_pb_num = 0  # to keep track of all bixels, or pencil beams (pb) in the plan
 for field_num in range(num_fields):
     print(f"\nField {field_num} / {num_fields}")
     
+    # to add the dose per field
+    total_dose = 0  
+
     # to keep track of all bixels, or pencil beams (pb) in the field
     field_pb_num = 0    
     
@@ -338,9 +341,9 @@ for field_num in range(num_fields):
         )  # x cm from target to get out of the body
         
         for pb_energy in bixel[4][0]:
-            
-            total_dose = 0  # to add the dose 
-            total_prompt_gamma_production = 0  # to add the prompt gamma production 
+             
+            # To add the prompt gamma production  per pb 
+            total_prompt_gamma_production = 0  
 
             idx_closest = min(
                 range(len(energy_array)),
@@ -409,12 +412,15 @@ for field_num in range(num_fields):
                 # Accumulate total prompt gamma production
                 total_prompt_gamma_production += prompt_gamma_production
 
+            
+            # Scaling the gamma production to the target dose
+            scaled_total_prompt_gamma_production = total_prompt_gamma_production * scaling_factor
             print(f"Total number of prompt gamma events before scaling (all isotopes): {np.sum(total_prompt_gamma_production):.3e}")
-
-            # Scaling the dose to the target dose
-            total_dose = total_dose * scaling_factor
-            total_prompt_gamma_production = total_prompt_gamma_production * scaling_factor
-            print(f"Dose scaling factor applied: {scaling_factor:.3e}")
-
-            del total_dose, total_prompt_gamma_production
+            print(f"Total number of prompt gamma events after scaling (all isotopes): {np.sum(scaled_total_prompt_gamma_production):.3e}") 
+                    
+            del total_prompt_gamma_production
+            gc.collect()
+    
+    total_dose = total_dose * scaling_factor
+    print(f"Total Dose: {np.sum(total_dose):.3e}")
 
