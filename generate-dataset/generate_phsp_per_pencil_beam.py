@@ -45,9 +45,13 @@ voxel_size = np.array([3, 3, 3])  # in mm
 
 isotope_list = ['C11', 'N13', 'O15', 'K38'] #, 'C10', 'O14', 'P30']
 prompt_gamma_list = ['P200', 'P210', 'P280', 'P443', 'P480',
-        'P373', 'P390', 'P163', 'P231', 'P510',
-        'P368', 'P520', 'P612', 'P632', 'P691',
-        'P711', 'P126']
+                     'P373', 'P390', 'P163', 'P231', 'P510',
+                     'P368', 'P520', 'P612', 'P632', 'P691',
+                     'P711', 'P126']
+prompt_gamma_energies = ['2.00', '2.10', '2.80', '4.43', '4.80',
+                     '3.73', '3.90', '1.63', '2.31', '5.10',
+                     '3.68', '5.20', '6.12', '6.32', '6.91',
+                     '7.11', '1.26'] # In MeV
 prompt_gamma_cross_sections_path = os.path.join(script_dir, "./prompt-gamma-cross-sections")
 
 #   MONTE CARLO SIMULATION OF THE TREATMENT
@@ -385,7 +389,7 @@ for field_num in range(num_fields):
             )
 
             # Crop and save prompt gamma production for each isotope
-            for prompt_gamma_line in prompt_gamma_list:
+            for index, prompt_gamma_line in enumerate(prompt_gamma_list):
                 # prompt_gamma_file_path = os.path.join(mhd_folder_path, f'{prompt_gamma_line}_scorer.mhd')  # For FRED v 3.6
                 prompt_gamma_file_path = os.path.join(
                     mhd_folder_path, f"Phantom.Activation_{prompt_gamma_line}.mhd"
@@ -406,7 +410,7 @@ for field_num in range(num_fields):
                 
                 scaled_prompt_gamma_production = prompt_gamma_production * scaling_factor
                 with open(phsp_file_path, "a", encoding = "utf-8") as file:
-                    file.write(f'Pb: {plan_pb_num}; Energy: {prompt_gamma_line}; Production: {np.sum(scaled_prompt_gamma_production):.3e}')
+                    file.write(f'Pb: {plan_pb_num}; Energy: {prompt_gamma_energies[index]}; Production: {np.sum(scaled_prompt_gamma_production):.3e}')
                     file.write("\n")   
 
                 # Accumulate total prompt gamma production
