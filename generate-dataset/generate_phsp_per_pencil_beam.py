@@ -409,9 +409,9 @@ for field_num in range(num_fields):
                 )
                 
                 scaled_prompt_gamma_production = prompt_gamma_production * scaling_factor
-                with open(phsp_file_path, "a", encoding = "utf-8") as file:
-                    file.write(f'Pb: {plan_pb_num}; Energy: {prompt_gamma_energies[index]}; Production: {np.sum(scaled_prompt_gamma_production):.3e}')
-                    file.write("\n")   
+                phsp_line = (f'0 0 0 1 1 {prompt_gamma_energies[index]} {plan_pb_num} 22 1 1\n')
+                with open(phsp_file_path, "a", encoding = "utf-8") as file:   
+                    file.write(phsp_line*int(np.sum(scaled_prompt_gamma_production)))   
 
                 # Accumulate total prompt gamma production
                 total_prompt_gamma_production += prompt_gamma_production
