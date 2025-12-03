@@ -409,9 +409,16 @@ for field_num in range(num_fields):
                 )
                 
                 scaled_prompt_gamma_production = prompt_gamma_production * scaling_factor
-                phsp_line = (f'0 0 0 1 1 {prompt_gamma_energies[index]} {plan_pb_num} 22 1 1\n')
-                with open(phsp_file_path, "a", encoding = "utf-8") as file:   
-                    file.write(phsp_line*int(np.sum(scaled_prompt_gamma_production)))   
+
+                # Calculate positions where production is not zero
+                mask = scaled_prompt_gamma_production != 0
+                i, j, k = np.nonzero(mask)
+                non_zero_gamma_production_values = scaled_prompt_gamma_production[mask]
+
+                with open(phsp_file_path, "a", encoding = "utf-8") as file:
+                    for x, y, z, v in zip(i, j, k, non_zero_gamma_production_values):
+                        phsp_line = (f'{x} {y} {z} 1 1 {prompt_gamma_energies[index]} {plan_pb_num} 22 1 1\n')
+                        file.write(phsp_line*int(v))   
 
                 # Accumulate total prompt gamma production
                 total_prompt_gamma_production += prompt_gamma_production
@@ -422,7 +429,7 @@ for field_num in range(num_fields):
             print(f"Total number of prompt gamma events before scaling (all isotopes): {np.sum(total_prompt_gamma_production):.3e}")
             print(f"Total number of prompt gamma events after scaling (all isotopes): {np.sum(scaled_total_prompt_gamma_production):.3e}") 
                     
-            del total_prompt_gamma_production
+            del total_prompt_gamma_production, mask, i, j, k, non_zero_gamma_production_values
             gc.collect()
     
     total_dose = total_dose * scaling_factor
