@@ -398,14 +398,14 @@ for field_num in range(num_fields):
         )
         # Currently not using the prompt gammas for anything, but they are scored in case they are needed in the future
         total_prompt_gamma_production += prompt_gamma_production
-
+    print(f"Total number of prompt gamma events before scaling (all isotopes): {np.sum(total_prompt_gamma_production):.3e}")
 # Scaling the dose to the target dose
 # this is done by matching the median dose in the CTV to the target dose (as found acceptable in https://doi.org/10.1186/s13014-022-02143-x)
 total_dose_CTV = total_dose[CTV_mask]
 scaling_factor = target_dose / np.median(total_dose_CTV)
 total_dose = total_dose * scaling_factor
 total_prompt_gamma_production = total_prompt_gamma_production * scaling_factor
-
+print(f"Dose scaling factor applied: {scaling_factor:.3e}")
 # Cropping and saving:
 # Saving dose
 dose_npy_path = os.path.join(dataset_folder, f"dose/sobp.npy")
