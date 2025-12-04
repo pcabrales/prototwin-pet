@@ -54,7 +54,7 @@ prompt_gamma_energies = ['2.00', '2.10', '2.80', '4.43', '4.80',
                      '7.11', '1.26'] # In MeV
 prompt_gamma_cross_sections_path = os.path.join(script_dir, "./prompt-gamma-cross-sections")
 
-#   MONTE CARLO SIMULATION OF THE TREATMENT
+#   MONTE CAR LO SIMULATION OF THE TREATMENT
 N_sobps = 1
 nprim = 2.8e5 # number of primary particles
 variance_reduction = True
