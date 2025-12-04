@@ -1,1 +1,0 @@
-head-sobp-nnFormer-v17: 1.90e+02 GFLOPs, 3.40e+08 parameters
