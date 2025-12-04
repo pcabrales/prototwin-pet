@@ -417,7 +417,10 @@ for field_num in range(num_fields):
 
                 with open(phsp_file_path, "a", encoding = "utf-8") as file:
                     for x, y, z, v in zip(i, j, k, non_zero_gamma_production_values):
-                        phsp_line = (f'{x} {y} {z} 1 1 {prompt_gamma_energies[index]} {plan_pb_num} 22 1 1\n')
+                        X_cm = (x*voxel_size[0]/10) - L_list[0]/2  # in cm
+                        Y_cm = (y*voxel_size[1]/10) - L_list[1]/2
+                        Z_cm = (z*voxel_size[2]/10) - L_list[2]/2
+                        phsp_line = (f'{X_cm:.4f} {Y_cm:.4f} {Z_cm:.4f} 1 1 {prompt_gamma_energies[index]} {plan_pb_num} 22 1 1\n')
                         file.write(phsp_line*int(v))   
 
                 # Accumulate total prompt gamma production
