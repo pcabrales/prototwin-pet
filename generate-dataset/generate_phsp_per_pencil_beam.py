@@ -15,6 +15,7 @@ from utils import (
     crop_save_image,
     crop_save_npy,
     convert_CT_to_mhd,
+    gram_schmidt
 )
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -40,7 +41,6 @@ mhd_file = os.path.join(dataset_folder, "CT.mhd")  # mhd file with the CT
 matRad_output = loadmat(os.path.join(script_dir, f"../data/{patient_name}/matRad-output.mat"))
 
 uncropped_shape = [183, 183, 90]  # Uncropped CT shape
-final_shape = [183, 183, 90]  # Final shape for the images, considering only where activity and dose are present (irradiated areas)
 voxel_size = np.array([3, 3, 3])  # in mm
 
 isotope_list = ['C11', 'N13', 'O15', 'K38'] #, 'C10', 'O14', 'P30']
@@ -84,7 +84,6 @@ convert_CT_to_mhd(
     matRad_output=matRad_output,
 )
 
-final_shape = np.array(final_shape)
 washout_HU_regions = [
     -np.inf,
     -150,
@@ -180,38 +179,6 @@ body_coords = (
 body_mask = np.zeros(uncropped_shape, dtype=bool)
 body_mask[body_coords] = True
 
-# Get a maximal crop of the body for sensitivity calculation
-indices = np.where(body_mask)
-xmin, xmax = np.min(indices[0]), np.max(indices[0])
-if xmax - xmin < final_shape[0]:
-    xmin = max(0, xmin - (final_shape[0] - (xmax - xmin)) // 2)
-    xmax = xmin + final_shape[0]
-ymin, ymax = np.min(indices[1]), np.max(indices[1])
-if ymax - ymin < final_shape[1]:
-    ymin = max(0, ymin - (final_shape[1] - (ymax - ymin)) // 2)
-    ymax = ymin + final_shape[1]
-zmin, zmax = np.min(indices[2]), np.max(indices[2])
-if zmax - zmin < final_shape[2]:
-    zmin = max(0, zmin - (final_shape[2] - (zmax - zmin)) // 2)
-    zmax = zmin + final_shape[2]
-
-with open(os.path.join(dataset_folder, "patient_info.txt"), "a") as patient_info_file:
-    patient_info_file.write(f"xmin: {xmin}, xmax: {xmax}\n")
-    patient_info_file.write(f"ymin: {ymin}, ymax: {ymax}\n")
-    patient_info_file.write(f"zmin: {zmin}, zmax: {zmax}\n")
-cropped_shape = (
-    -xmin + xmax,
-    -ymin + ymax,
-    -zmin + zmax,
-)  # Cropped CT including the body, removing empty areas
-Trans = (
-    0,
-    0,
-    0,
-)  # Offset in the cropped image to get the final image (removed it for easier processing)
-
-body_mask = body_mask[xmin:xmax, ymin:ymax, zmin:zmax]
-
 # Importing the CTV to find the dose inside it
 CTV_indices = matRad_output["CTV_indices"].T[0]  # Before: cst[32, 3][0][0].T[0]
 CTV_indices -= 1  # 0-based indexing, from MATLAB to Python
@@ -225,7 +192,6 @@ CTV_coords = (
 )  # Adjusting from MATLAB to Python
 CTV_mask = np.zeros(uncropped_shape, dtype=bool)
 CTV_mask[CTV_coords] = True
-CTV_mask = CTV_mask[xmin:xmax, ymin:ymax, zmin:zmax]
 
 HU_regions = [
     -1000,
@@ -272,19 +238,8 @@ CT_cropped = crop_save_image(
     CT_file_path,
     is_CT_image=True,
     uncropped_shape=uncropped_shape,
-    xmin=xmin,
-    xmax=xmax,
-    ymin=ymin,
-    ymax=ymax,
-    zmin=zmin,
-    zmax=zmax,
 )  # I need to save CT because I use it later
 np.save(os.path.join(dataset_folder, "CT_cropped.npy"), CT_cropped)
-CT_npy_path = os.path.join(dataset_folder, "CT.npy")
-CT_raw_path = None  # os.path.join(dataset_folder, 'CT_cropped.raw')
-crop_save_npy(
-    CT_cropped, CT_npy_path, raw_path=CT_raw_path, Trans=Trans, HL=final_shape // 2
-)
 
 # ----------------------------------------------------------------------------------------------------------------------------------------
 # -------------------------------------------- Simulating each field with FRED -----------------------------------------------------------
@@ -343,7 +298,20 @@ for field_num in range(num_fields):
         sourcePoint_bixel = (
             pos_target_deviated - pb_direction * 25 ### BEAM HAS TO START OUTSIDE THE BODY (8 cm is usually ok for neck, but not for prostate)
         )  # x cm from target to get out of the body
-        
+         
+        # Create a non-collinear vector to pb direction (generic choice)
+        candidate = np.array([1.0, 0.0, 0.0])
+        if np.allclose(np.cross(pb_direction, candidate), 0):
+            candidate = np.array([0.0, 1.0, 0.0])
+        W = candidate
+
+        # Get unitary perpendicular vector to pb_direction using Gram–Schmidt
+        u1, u2 = gram_schmidt(pb_direction, W)
+
+        # Compute second unitary perpendicular vector to pb_direction
+        u3 = np.cross(u1, u2)
+        u3 = u3 / np.linalg.norm(u3)
+
         for pb_energy in bixel[4][0]:
              
             # To add the prompt gamma production  per pb 
@@ -377,12 +345,6 @@ for field_num in range(num_fields):
             total_dose += crop_save_image(
                 dose_file_path,
                 uncropped_shape=uncropped_shape,
-                xmin=xmin,
-                xmax=xmax,
-                ymin=ymin,
-                ymax=ymax,
-                zmin=zmin,
-                zmax=zmax,
                 crop_body=True,
                 body_coords=body_coords,
                 save_raw=save_raw,
@@ -396,12 +358,6 @@ for field_num in range(num_fields):
                 )  # For FRED v 3.7
                 prompt_gamma_production = crop_save_image(
                     prompt_gamma_file_path,
-                    xmin=xmin,
-                    xmax=xmax,
-                    ymin=ymin,
-                    ymax=ymax,
-                    zmin=zmin,
-                    zmax=zmax,
                     uncropped_shape=uncropped_shape,
                     save_raw=save_raw,
                     crop_body=True,
@@ -417,16 +373,26 @@ for field_num in range(num_fields):
 
                 with open(phsp_file_path, "a", encoding = "utf-8") as file:
                     for x, y, z, v in zip(i, j, k, non_zero_gamma_production_values):
-                        X_cm = (x*voxel_size[0]/10) - L_list[0]/2  # in cm
-                        Y_cm = (y*voxel_size[1]/10) - L_list[1]/2
-                        Z_cm = (z*voxel_size[2]/10) - L_list[2]/2
-                        phsp_line = (f'{X_cm:.4f} {Y_cm:.4f} {Z_cm:.4f} 1 1 {prompt_gamma_energies[index]} {plan_pb_num} 22 1 1\n')
-                        file.write(phsp_line*int(v))   
+                      
+                      # Sample direction vector to plane perpendicular to pb_direction
+                      sampled_angle_on_plane = np.random.uniform(0, 2*np.pi, size = int(v)) # Generate 'v' angles
+                      sampled_vector = np.cos(sampled_angle_on_plane)[:, np.newaxis] * u2 + np.sin(sampled_angle_on_plane)[:, np.newaxis] * u3 # Correct broadcasting
 
-                # Accumulate total prompt gamma production
-                total_prompt_gamma_production += prompt_gamma_production
+                      X_cm = (x*voxel_size[0]/10) - L_list[0]/2  # in cm
+                      Y_cm = (y*voxel_size[1]/10) - L_list[1]/2
+                      Z_cm = (z*voxel_size[2]/10) - L_list[2]/2
+                      # Extract direction cosines for all 'v' samples
+                      cos_x_coords = sampled_vector[:, 0]
+                      cos_y_coords = sampled_vector[:, 1]
 
-            
+                      # Generate all 'v' lines using a list comprehension
+                      # Assuming the format should be X Y Z U V W Energy PBN 22 1 1
+                      lines_to_write = [
+                          f'{X_cm:.4f} {Y_cm:.4f} {Z_cm:.4f} {cx:.4f} {cy:.4f} {prompt_gamma_energies[index]} {plan_pb_num} 22 1 1\n'
+                          for cx, cy in zip(cos_x_coords, cos_y_coords)
+                      ]
+                      file.writelines(lines_to_write)
+
             # Scaling the gamma production to the target dose
             scaled_total_prompt_gamma_production = total_prompt_gamma_production * scaling_factor
             print(f"Total number of prompt gamma events before scaling (all isotopes): {np.sum(total_prompt_gamma_production):.3e}")
