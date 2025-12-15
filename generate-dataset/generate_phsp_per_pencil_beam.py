@@ -62,7 +62,7 @@ maxNumIterations = 10  # Number of times the simulation is repeated (only if var
 stratified_sampling = True
 Espread = 0.006  # fractional energy spread (0.6%)
 target_dose = 2.18  # Gy  (corresponds to a standard 72 Gy, 33 fractions treatment)
-scaling_factor = 1 # scaling factor to get the desired target dose (pre-calculated)
+scaling_factor = 6.335e-01 # scaling factor to get the desired target dose (pre-calculated)
 N_reference = 2e6  # reference number of particles per bixel, not too relevant, will be scaled to the target dose, just needs to be large enough to avoid rounding errors when multiplying by the weights
 save_raw = False # Save raws (not saving them currently because they are too large)
 
@@ -84,14 +84,6 @@ convert_CT_to_mhd(
     matRad_output=matRad_output,
 )
 
-washout_HU_regions = [
-    -np.inf,
-    -150,
-    -30,
-    200,
-    1000,
-    +np.inf,
-]  # According to Parodi et al. 2007
 if variance_reduction:
     nprim = nprim // maxNumIterations
 
@@ -178,50 +170,6 @@ body_coords = (
 )  # Adjusting from MATLAB to Python
 body_mask = np.zeros(uncropped_shape, dtype=bool)
 body_mask[body_coords] = True
-
-# Importing the CTV to find the dose inside it
-CTV_indices = matRad_output["CTV_indices"].T[0]  # Before: cst[32, 3][0][0].T[0]
-CTV_indices -= 1  # 0-based indexing, from MATLAB to Python
-CTV_coords = xp.unravel_index(
-    CTV_indices, [uncropped_shape[2], uncropped_shape[1], uncropped_shape[0]]
-)  # Convert to multi-dimensional form
-CTV_coords = (
-    CTV_coords[1],
-    CTV_coords[2],
-    CTV_coords[0],
-)  # Adjusting from MATLAB to Python
-CTV_mask = np.zeros(uncropped_shape, dtype=bool)
-CTV_mask[CTV_coords] = True
-
-HU_regions = [
-    -1000,
-    -950,
-    -120,
-    -83,
-    -53,
-    -23,
-    7,
-    18,
-    80,
-    120,
-    200,
-    300,
-    400,
-    500,
-    600,
-    700,
-    800,
-    900,
-    1000,
-    1100,
-    1200,
-    1300,
-    1400,
-    1500,
-    2995,
-    2996,
-]  # HU Regions
-
 
 # Fix the random seed
 random.seed(seed_number)
