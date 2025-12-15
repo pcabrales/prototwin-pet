@@ -298,7 +298,7 @@ for field_num in range(num_fields):
         sourcePoint_bixel = (
             pos_target_deviated - pb_direction * 25 ### BEAM HAS TO START OUTSIDE THE BODY (8 cm is usually ok for neck, but not for prostate)
         )  # x cm from target to get out of the body
-         
+
         # Create a non-collinear vector to pb direction (generic choice)
         candidate = np.array([1.0, 0.0, 0.0])
         if np.allclose(np.cross(pb_direction, candidate), 0):
@@ -385,10 +385,14 @@ for field_num in range(num_fields):
                       cos_x_coords = sampled_vector[:, 0]
                       cos_y_coords = sampled_vector[:, 1]
 
+                      # Calculate proton travel time
+                      proton_travelled_dist = np.linalg.norm(sourcePoint_bixel - np.array([X_cm, Y_cm, Z_cm]))
+                      proton_speed = 1.38e8  # cm/s for 160 MeV protons, approximate constant speed inside the body
+                      proton_travel_time = (proton_travelled_dist / proton_speed) * 1e9  # in ns
+
                       # Generate all 'v' lines using a list comprehension
-                      # Assuming the format should be X Y Z U V W Energy PBN 22 1 1
                       lines_to_write = [
-                          f'{X_cm:.4f} {Y_cm:.4f} {Z_cm:.4f} {cx:.4f} {cy:.4f} {prompt_gamma_energies[index]} {plan_pb_num} 22 1 1\n'
+                          f'{X_cm:.4f} {Y_cm:.4f} {Z_cm:.4f} {cx:.4f} {cy:.4f} {prompt_gamma_energies[index]} {plan_pb_num} 22 {proton_travel_time:.4f} 1\n'
                           for cx, cy in zip(cos_x_coords, cos_y_coords)
                       ]
                       file.writelines(lines_to_write)
