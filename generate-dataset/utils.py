@@ -514,7 +514,27 @@ def convert_CT_to_mhd(
     print(f"Conversion complete. MHD file saved at: {mhd_file}")
     return None
 
-
+def gram_schmidt(v, w):
+    """
+    Given vector v and a non-collinear vector w,
+    apply Gram–Schmidt to produce an orthonormal vector u2 orthogonal to v.
+    """
+    
+    assert np.linalg.norm(v) != 0
+    
+    u1 = v / np.linalg.norm(v)
+    
+    # Remove projection of w onto u1
+    
+    proj = np.dot(w, u1) * u1
+    w_orth = w - proj
+    
+    assert np.linalg.norm(v) != 0
+    
+    u2 = w_orth / np.linalg.norm(w_orth)
+    
+    return u1, u2
+    
 ### To test the different between the original plan on different random seeds for different number of primaries
 # # (Considering statistical fluctuations in the planned dose without deviations)
 # seed_number = 42 * sobp_num
